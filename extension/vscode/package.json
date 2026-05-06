@@ -1,6 +1,6 @@
 {
-  "name": "aivion-mask",
-  "displayName": "Aivion Mask",
+  "name": "aivion-mask-vscode",
+  "displayName": "Aivion Mask — Clipboard Guard",
   "description": "Masks credentials and secrets before they reach AI coding assistants",
   "version": "0.1.0",
   "publisher": "raianul",
