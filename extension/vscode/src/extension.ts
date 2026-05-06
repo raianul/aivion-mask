@@ -19,7 +19,9 @@ export function activate(context: vscode.ExtensionContext): void {
     const mode = config().get<string>('clipboard.mode', 'warn')
 
     if (mode === 'block') {
-      void vscode.env.clipboard.writeText(masked)
+      void vscode.env.clipboard.writeText(masked).then(() => {
+        monitor?.updateLastText(masked)
+      })
       statusBar?.setDetected(count)
     } else {
       const noun = count === 1 ? 'secret' : 'secrets'

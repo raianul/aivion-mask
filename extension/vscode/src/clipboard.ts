@@ -41,9 +41,12 @@ export class ClipboardMonitor {
     if (matches.length === 0) return
 
     const masked = mask(text, matches)
-    // Update lastText to the masked version BEFORE notifying.
-    // This prevents a re-trigger when block mode writes masked text back to clipboard.
-    this.lastText = masked
     this.onDetect(matches.length, masked)
+  }
+
+  // Called by extension after writing masked text to clipboard in block mode,
+  // so the next poll doesn't re-detect the already-masked content.
+  updateLastText(text: string): void {
+    this.lastText = text
   }
 }
