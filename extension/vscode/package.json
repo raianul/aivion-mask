@@ -3,7 +3,7 @@
   "displayName": "Aivion Mask",
   "description": "Masks credentials and secrets before they reach AI coding assistants",
   "version": "0.1.0",
-  "publisher": "aivionlabs",
+  "publisher": "raianul",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
