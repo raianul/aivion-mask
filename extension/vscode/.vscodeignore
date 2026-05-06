@@ -1,0 +1,8 @@
+.eslintrc.json
+.prettierrc.json
+**/*.ts
+!out/**
+src/
+.vscode/
+tsconfig.json
+.gitignore

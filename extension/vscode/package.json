@@ -1,0 +1,68 @@
+{
+  "name": "aivion-mask",
+  "displayName": "Aivion Mask",
+  "description": "Masks credentials and secrets before they reach AI coding assistants",
+  "version": "0.1.0",
+  "publisher": "aivionlabs",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Other"],
+  "keywords": ["security", "pii", "secrets", "clipboard", "ai", "copilot", "cursor"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "aivion-mask.toggle",
+        "title": "Aivion Mask: Toggle On/Off"
+      }
+    ],
+    "configuration": {
+      "title": "Aivion Mask",
+      "properties": {
+        "aivion-mask.clipboard.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable clipboard monitoring for secrets"
+        },
+        "aivion-mask.clipboard.mode": {
+          "type": "string",
+          "enum": ["warn", "block"],
+          "enumDescriptions": [
+            "Show a notification when secrets are detected",
+            "Silently replace clipboard contents with masked text"
+          ],
+          "default": "warn",
+          "description": "What to do when secrets are detected in the clipboard"
+        },
+        "aivion-mask.clipboard.pollIntervalMs": {
+          "type": "number",
+          "default": 500,
+          "minimum": 100,
+          "maximum": 5000,
+          "description": "How often to check the clipboard (milliseconds)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js",
+    "package": "vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^20.11.5",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.1",
+    "@typescript-eslint/parser": "^6.19.1",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^2.23.0",
+    "eslint": "^8.56.0",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3"
+  }
+}
