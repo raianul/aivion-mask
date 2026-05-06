@@ -12,6 +12,7 @@ node_modules/
 dist/
 *.vsix
 *.crx
+extension/vscode/*.vsix
 
 # OS
 .DS_Store
