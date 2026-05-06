@@ -64,10 +64,15 @@ Same `session_id` across turns prevents the "turn 3 leak" — an entity mentione
 
 Protects secrets before they reach Cursor, Continue, GitHub Copilot, or any AI coding assistant.
 
-Three modes:
-- **Clipboard guard** — intercepts clipboard, replaces secrets before paste (works everywhere, zero config)
-- **Proxy mode** — local OpenAI-compatible server, point your AI tool at `http://localhost:8003/v1/openai`
-- **MCP server** — auto-discovered by Continue and MCP-aware tools, no manual config
+**Phase 0 (shipped)** — Clipboard guard. Intercepts clipboard on copy, replaces detected secrets with `[REDACTED:TYPE]` before you paste. 40 credential patterns. No server, no config.
+
+```
+Install: ext install raianul.aivion-mask-vscode
+```
+
+**Phase 1 (planned)** — Proxy mode + MCP server. Local OpenAI-compatible server at `http://localhost:8003/v1/openai`. Session tokens (`__P1__`, `__P2__`) replace PII end-to-end with full restore in the response.
+
+**Phase 2 (planned)** — Deep integration. Live scan of open files, inline decorations, pre-commit hook.
 
 [Full plan →](doc/platform/VS_CODE.md)
 
@@ -152,7 +157,7 @@ Local mode is the default for the VS Code and browser extensions. Server mode is
 ## Roadmap
 
 - [x] Core masking logic + token format
-- [ ] VS Code extension — clipboard guard (Phase 0)
+- [x] VS Code extension — clipboard guard (Phase 0) — [install](https://marketplace.visualstudio.com/items?itemName=raianul.aivion-mask-vscode)
 - [ ] VS Code extension — proxy mode + MCP server (Phase 1)
 - [ ] Browser extension — Chrome/Firefox (Phase 1)
 - [ ] Python SDK

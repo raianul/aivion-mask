@@ -2,7 +2,7 @@
   "name": "aivion-mask-vscode",
   "displayName": "Aivion Mask — Clipboard Guard",
   "description": "Masks credentials and secrets before they reach AI coding assistants",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "raianul",
   "license": "Apache-2.0",
   "repository": {
@@ -10,10 +10,24 @@
     "url": "https://github.com/raianul/aivion-mask"
   },
   "icon": "images/icon.png",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Other"],
-  "keywords": ["security", "pii", "secrets", "clipboard", "ai", "copilot", "cursor"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "security",
+    "pii",
+    "secrets",
+    "clipboard",
+    "ai",
+    "copilot",
+    "cursor"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [
@@ -32,7 +46,10 @@
         },
         "aivion-mask.clipboard.mode": {
           "type": "string",
-          "enum": ["warn", "block"],
+          "enum": [
+            "warn",
+            "block"
+          ],
           "enumDescriptions": [
             "Show a notification when secrets are detected",
             "Silently replace clipboard contents with masked text"
