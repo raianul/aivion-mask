@@ -4,6 +4,12 @@
   "description": "Masks credentials and secrets before they reach AI coding assistants",
   "version": "0.1.0",
   "publisher": "aivionlabs",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/raianul/aivion-mask"
+  },
+  "icon": "images/icon.png",
   "engines": { "vscode": "^1.85.0" },
   "categories": ["Other"],
   "keywords": ["security", "pii", "secrets", "clipboard", "ai", "copilot", "cursor"],
