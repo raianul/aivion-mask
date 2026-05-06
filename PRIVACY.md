@@ -42,7 +42,7 @@ Since no personal data is collected or stored, there is no data to access, corre
 If you have any questions, contact:
 
 **Controller:** Sayed Raianul Kabir, Germany
-**Email:** raianul.berlin@gmail.com
+**Email:** raianul.kabir@gmail.com
 **GitHub:** https://github.com/raianul/aivion-mask
 
 ## Future versions
