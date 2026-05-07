@@ -110,15 +110,15 @@ async def forward_complete_anthropic(
     session_id: str,
     conn,
     unmask_response: bool = True,
+    query_string: str = "",
 ) -> dict:
     """Forward a non-streaming Anthropic /v1/messages request; optionally unmask the response."""
     mappings = await get_all_mappings(conn, session_id) if unmask_response else {}
+    url = f"{ANTHROPIC_UPSTREAM}/v1/messages"
+    if query_string:
+        url = f"{url}?{query_string}"
     async with httpx.AsyncClient(timeout=120) as client:
-        response = await client.post(
-            f"{ANTHROPIC_UPSTREAM}/v1/messages",
-            json=body,
-            headers=upstream_headers,
-        )
+        response = await client.post(url, json=body, headers=upstream_headers)
         response.raise_for_status()
         data = response.json()
     if unmask_response:
@@ -132,6 +132,7 @@ async def forward_streaming_anthropic(
     session_id: str,
     conn,
     unmask_response: bool = True,
+    query_string: str = "",
 ) -> AsyncIterator[bytes]:
     """Forward a streaming Anthropic /v1/messages request; unmask text as it arrives."""
     mappings = await get_all_mappings(conn, session_id) if unmask_response else {}
@@ -141,9 +142,12 @@ async def forward_streaming_anthropic(
     json_accum: dict[int, str] = {}
     block_types: dict[int, str] = {}
 
+    url = f"{ANTHROPIC_UPSTREAM}/v1/messages"
+    if query_string:
+        url = f"{url}?{query_string}"
     async with httpx.AsyncClient(timeout=120) as client:
         async with client.stream(
-            "POST", f"{ANTHROPIC_UPSTREAM}/v1/messages", json=body, headers=upstream_headers
+            "POST", url, json=body, headers=upstream_headers
         ) as response:
             async for event_name, payload in _parse_anthropic_sse(response):
                 ename = event_name or "data"

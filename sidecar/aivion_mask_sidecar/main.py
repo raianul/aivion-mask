@@ -116,13 +116,18 @@ async def messages(request: Request):
     )
 
     upstream_headers: dict[str, str] = {}
-    for h in ("Authorization", "x-api-key", "anthropic-version", "anthropic-beta"):
-        v = request.headers.get(h)
-        if v is not None:
-            upstream_headers[h] = v
+    skip = {"host", "content-length", "transfer-encoding", "x-aivion-session"}
+    for name, value in request.headers.items():
+        if name.lower() in skip:
+            continue
+        upstream_headers[name] = value
     upstream_headers["Content-Type"] = "application/json"
 
-    if not upstream_headers.get("Authorization") and not upstream_headers.get("x-api-key"):
+    # Preserve upstream query string (e.g. ?beta=true from Claude Code)
+    query_string = request.url.query  # e.g. "beta=true" or ""
+
+    has_auth = any(k.lower() in ("authorization", "x-api-key") for k in upstream_headers)
+    if not has_auth:
         raise HTTPException(
             status_code=401,
             detail="No auth provided. Send Authorization: Bearer <token> or x-api-key.",
@@ -136,12 +141,14 @@ async def messages(request: Request):
         if body.get("stream", False):
             return StreamingResponse(
                 forward_streaming_anthropic(
-                    masked_body, upstream_headers, session_id, _conn, unmask_response=unmask
+                    masked_body, upstream_headers, session_id, _conn,
+                    unmask_response=unmask, query_string=query_string,
                 ),
                 media_type="text/event-stream",
             )
         result = await forward_complete_anthropic(
-            masked_body, upstream_headers, session_id, _conn, unmask_response=unmask
+            masked_body, upstream_headers, session_id, _conn,
+            unmask_response=unmask, query_string=query_string,
         )
         return JSONResponse(result)
     except Exception as exc:

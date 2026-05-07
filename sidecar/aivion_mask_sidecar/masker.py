@@ -3,6 +3,7 @@ import asyncio
 import logging
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from .session import get_token, next_index, save_token, get_all_mappings
 from .tokens import entity_abbrev, make_token, register_abbrev
@@ -70,6 +71,60 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 ]
 
 
+# Entity types that get structural (per-component) masking instead of whole-value replacement
+_URL_TYPES = {"DATABASE_URL", "DATABASE_URL_REDIS", "URL_WITH_CREDENTIALS"}
+
+
+async def _get_or_create_token(
+    conn, session_id: str, value: str, entity_type: str, ttl_hours: int
+) -> str:
+    token = await get_token(conn, session_id, value)
+    if token is None:
+        abbrev = entity_abbrev(entity_type)
+        idx = await next_index(conn, session_id, abbrev)
+        token = make_token(entity_type, idx)
+        await save_token(conn, session_id, token, value, idx, ttl_hours)
+        preview = value[:12] + ("..." if len(value) > 12 else "")
+        _log.info("[MASKED] %s → %s  (%s)", entity_type, token, preview)
+    return token
+
+
+async def _mask_url_parts(url: str, conn, session_id: str, ttl_hours: int) -> str:
+    """Replace username, password, hostname, and db name with individual tokens.
+
+    Preserves scheme, port, and URL structure so the LLM retains semantic meaning.
+    Falls back to whole-URL masking if the URL can't be parsed.
+    """
+    try:
+        p = urlparse(url)
+        if not p.scheme or not p.netloc:
+            raise ValueError("not a full URL")
+    except Exception:
+        return await _get_or_create_token(conn, session_id, url, "DATABASE_URL", ttl_hours)
+
+    port_str = f":{p.port}" if p.port else ""
+
+    user_tok = await _get_or_create_token(conn, session_id, p.username, "URL_USER", ttl_hours) if p.username else None
+    pass_tok = await _get_or_create_token(conn, session_id, p.password, "URL_PASS", ttl_hours) if p.password else None
+    host_tok = await _get_or_create_token(conn, session_id, p.hostname, "URL_HOST", ttl_hours) if p.hostname else None
+    db_name  = p.path.lstrip("/") if p.path else ""
+    db_tok   = await _get_or_create_token(conn, session_id, db_name, "URL_DB", ttl_hours) if db_name else None
+
+    host_part = f"{host_tok or p.hostname or ''}{port_str}"
+    if user_tok and pass_tok:
+        netloc = f"{user_tok}:{pass_tok}@{host_part}"
+    elif user_tok:
+        netloc = f"{user_tok}@{host_part}"
+    elif pass_tok:
+        # Redis-style: redis://:password@host
+        netloc = f":{pass_tok}@{host_part}"
+    else:
+        netloc = host_part
+
+    path = f"/{db_tok}" if db_tok else ""
+    return f"{p.scheme}://{netloc}{path}"
+
+
 def detect(text: str) -> list[Entity]:
     """Find all credential entities in text. Deduplicates overlapping spans."""
     candidates: list[Entity] = []
@@ -107,16 +162,12 @@ async def mask_message(
     if not entities:
         return text
 
-    # Step 3: assign tokens, replace right-to-left to preserve indices
+    # Step 3: replace right-to-left to preserve indices
     entities.sort(key=lambda e: e.start, reverse=True)
     for entity in entities:
-        token = await get_token(conn, session_id, entity.value)
-        if token is None:
-            abbrev = entity_abbrev(entity.entity_type)
-            idx = await next_index(conn, session_id, abbrev)
-            token = make_token(entity.entity_type, idx)
-            await save_token(conn, session_id, token, entity.value, idx, ttl_hours)
-            preview = entity.value[:12] + ("..." if len(entity.value) > 12 else "")
-            _log.info("[MASKED] %s → %s  (%s)", entity.entity_type, token, preview)
-        text = text[: entity.start] + token + text[entity.end :]
+        if entity.entity_type in _URL_TYPES:
+            replacement = await _mask_url_parts(entity.value, conn, session_id, ttl_hours)
+        else:
+            replacement = await _get_or_create_token(conn, session_id, entity.value, entity.entity_type, ttl_hours)
+        text = text[: entity.start] + replacement + text[entity.end :]
     return text

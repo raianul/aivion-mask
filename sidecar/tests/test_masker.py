@@ -56,9 +56,18 @@ async def test_mask_message_assigns_token(conn):
     assert "AKIA" + "A" * 16 not in result
     assert "__AWS1__" in result
 
-async def test_mask_message_database_url_token(conn):
+async def test_mask_message_database_url_structural(conn):
     result = await mask_message("postgresql://user:pass@localhost:5432/mydb", conn, "s1", 8)
-    assert "postgresql" not in result
+    # scheme and port preserved; credentials replaced with typed tokens
+    assert result.startswith("postgresql://")
+    assert ":5432/" in result
+    assert "user" not in result
+    assert "pass" not in result
+    assert "localhost" not in result
+    assert "mydb" not in result
+    assert "__USER1__" in result
+    assert "__PASS1__" in result
+    assert "__HOST1__" in result
     assert "__DB1__" in result
 
 async def test_mask_message_type_specific_abbrev(conn):
@@ -89,6 +98,9 @@ async def test_mask_message_per_type_counter(conn):
 
 async def test_mask_message_different_types_independent_counters(conn):
     aws_result = await mask_message("AKIA" + "A" * 16, conn, "s1", 8)
-    db_result = await mask_message("postgresql://user:pass@localhost/db", conn, "s1", 8)
+    db_result = await mask_message("postgresql://user:pass@localhost/mydb", conn, "s1", 8)
     assert "__AWS1__" in aws_result
-    assert "__DB1__" in db_result
+    # structural masking: scheme preserved, components tokenised
+    assert db_result.startswith("postgresql://")
+    assert "__USER1__" in db_result
+    assert "__PASS1__" in db_result
