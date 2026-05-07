@@ -1,7 +1,7 @@
 from __future__ import annotations
+import asyncio
 import logging
 import re
-import sqlite3
 from dataclasses import dataclass
 
 from .session import get_token, next_index, save_token, get_all_mappings
@@ -89,32 +89,33 @@ def detect(text: str) -> list[Entity]:
     return result
 
 
-def mask_message(
+async def mask_message(
     text: str,
-    conn: sqlite3.Connection,
+    conn,
     session_id: str,
     ttl_hours: int,
 ) -> str:
     """Pre-redact known entities, detect new ones, assign tokens, return masked text."""
     # Step 1: replace known values with their tokens (prevents turn-3 leak)
-    mappings = get_all_mappings(conn, session_id)  # {token: original}
+    mappings = await get_all_mappings(conn, session_id)  # {token: original}
     for token, original in mappings.items():
         text = text.replace(original, token)
 
-    # Step 2: detect new entities in the (now pre-redacted) text
-    entities = detect(text)
+    # Step 2: detect new entities — CPU-bound regex runs in thread pool
+    loop = asyncio.get_running_loop()
+    entities = await loop.run_in_executor(None, detect, text)
     if not entities:
         return text
 
     # Step 3: assign tokens, replace right-to-left to preserve indices
     entities.sort(key=lambda e: e.start, reverse=True)
     for entity in entities:
-        token = get_token(conn, session_id, entity.value)
+        token = await get_token(conn, session_id, entity.value)
         if token is None:
             abbrev = entity_abbrev(entity.entity_type)
-            idx = next_index(conn, session_id, abbrev)
+            idx = await next_index(conn, session_id, abbrev)
             token = make_token(entity.entity_type, idx)
-            save_token(conn, session_id, token, entity.value, idx, ttl_hours)
+            await save_token(conn, session_id, token, entity.value, idx, ttl_hours)
             preview = entity.value[:12] + ("..." if len(entity.value) > 12 else "")
             _log.info("[MASKED] %s → %s  (%s)", entity.entity_type, token, preview)
         text = text[: entity.start] + token + text[entity.end :]

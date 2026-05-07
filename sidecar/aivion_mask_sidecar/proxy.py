@@ -1,6 +1,5 @@
 from __future__ import annotations
 import json
-import sqlite3
 from typing import AsyncIterator
 
 import httpx
@@ -15,11 +14,11 @@ async def forward_complete(
     api_base: str,
     api_key: str,
     session_id: str,
-    conn: sqlite3.Connection,
+    conn,
     unmask_response: bool = True,
 ) -> dict:
     """Forward a non-streaming request; optionally unscrub tokens in the response."""
-    mappings = get_all_mappings(conn, session_id) if unmask_response else {}
+    mappings = await get_all_mappings(conn, session_id) if unmask_response else {}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     async with httpx.AsyncClient(timeout=120) as client:
         response = await client.post(
@@ -40,11 +39,11 @@ async def forward_streaming(
     api_base: str,
     api_key: str,
     session_id: str,
-    conn: sqlite3.Connection,
+    conn,
     unmask_response: bool = True,
 ) -> AsyncIterator[bytes]:
     """Forward a streaming request; optionally unscrub tokens via lookahead buffer."""
-    mappings = get_all_mappings(conn, session_id) if unmask_response else {}
+    mappings = await get_all_mappings(conn, session_id) if unmask_response else {}
     buf = LookaheadBuffer(mappings)
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 

@@ -22,17 +22,17 @@ async def lifespan(app: FastAPI):
     global _config, _conn
     _config = load_config()
     register_custom_patterns(_config.sidecar.custom_patterns)
-    _conn = init_db()
+    _conn = await init_db()
     task = asyncio.create_task(_cleanup_loop())
     yield
     task.cancel()
-    _conn.close()
+    await _conn.close()
 
 
 async def _cleanup_loop() -> None:
     while True:
         await asyncio.sleep(600)
-        cleanup_expired(_conn)
+        await cleanup_expired(_conn)
 
 
 app = FastAPI(lifespan=lifespan)
@@ -56,8 +56,8 @@ def mcp():
 
 
 @app.delete("/v1/session/{session_id}")
-def clear_session(session_id: str):
-    delete_session(_conn, session_id)
+async def clear_session(session_id: str):
+    await delete_session(_conn, session_id)
     return {"deleted": session_id}
 
 
@@ -76,17 +76,16 @@ async def chat_completions(request: Request):
             detail="No LLM API key configured. Edit ~/.aivion-mask/config.toml",
         )
 
-    # Mask each message content
     messages = body.get("messages", [])
     masked_messages = []
     for msg in messages:
         content = msg.get("content", "")
         if isinstance(content, str) and content:
-            content = mask_message(content, _conn, session_id, _config.sidecar.session_ttl_hours)
+            content = await mask_message(content, _conn, session_id, _config.sidecar.session_ttl_hours)
         masked_messages.append({**msg, "content": content})
 
     masked_body = {**body, "messages": masked_messages}
-    masked_body.pop("user", None)  # don't leak session_id to upstream
+    masked_body.pop("user", None)
 
     try:
         unmask = _config.sidecar.unmask_response
@@ -112,4 +111,9 @@ def run() -> None:
     import uvicorn
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     cfg = load_config()
-    uvicorn.run("aivion_mask_sidecar.main:app", host="127.0.0.1", port=cfg.sidecar.port)
+    uvicorn.run(
+        "aivion_mask_sidecar.main:app",
+        host="127.0.0.1",
+        port=cfg.sidecar.port,
+        workers=2,
+    )

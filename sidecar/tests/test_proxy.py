@@ -6,11 +6,11 @@ from aivion_mask_sidecar.proxy import forward_streaming, forward_complete
 from aivion_mask_sidecar.session import init_db, save_token
 
 @pytest.fixture
-def conn(tmp_path):
-    c = init_db(tmp_path / "t.db")
-    save_token(c, "s1", "__DB1__", "secret123", 1, ttl_hours=8)
+async def conn(tmp_path):
+    c = await init_db(tmp_path / "t.db")
+    await save_token(c, "s1", "__DB1__", "secret123", 1, ttl_hours=8)
     yield c
-    c.close()
+    await c.close()
 
 @respx.mock
 @pytest.mark.asyncio
