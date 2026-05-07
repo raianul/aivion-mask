@@ -16,9 +16,10 @@ async def forward_complete(
     api_key: str,
     session_id: str,
     conn: sqlite3.Connection,
+    unmask_response: bool = True,
 ) -> dict:
-    """Forward a non-streaming request; unscrub tokens in the response."""
-    mappings = get_all_mappings(conn, session_id)
+    """Forward a non-streaming request; optionally unscrub tokens in the response."""
+    mappings = get_all_mappings(conn, session_id) if unmask_response else {}
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     async with httpx.AsyncClient(timeout=120) as client:
         response = await client.post(
@@ -26,10 +27,11 @@ async def forward_complete(
         )
         response.raise_for_status()
         data = response.json()
-    for choice in data.get("choices", []):
-        msg = choice.get("message", {})
-        if isinstance(msg.get("content"), str):
-            msg["content"] = replace_tokens(msg["content"], mappings)
+    if unmask_response:
+        for choice in data.get("choices", []):
+            msg = choice.get("message", {})
+            if isinstance(msg.get("content"), str):
+                msg["content"] = replace_tokens(msg["content"], mappings)
     return data
 
 
@@ -39,9 +41,10 @@ async def forward_streaming(
     api_key: str,
     session_id: str,
     conn: sqlite3.Connection,
+    unmask_response: bool = True,
 ) -> AsyncIterator[bytes]:
-    """Forward a streaming request; unscrub tokens via lookahead buffer."""
-    mappings = get_all_mappings(conn, session_id)
+    """Forward a streaming request; optionally unscrub tokens via lookahead buffer."""
+    mappings = get_all_mappings(conn, session_id) if unmask_response else {}
     buf = LookaheadBuffer(mappings)
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
 

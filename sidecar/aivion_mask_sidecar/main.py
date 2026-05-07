@@ -88,15 +88,18 @@ async def chat_completions(request: Request):
     masked_body.pop("user", None)  # don't leak session_id to upstream
 
     try:
+        unmask = _config.sidecar.unmask_response
         if body.get("stream", False):
             return StreamingResponse(
                 forward_streaming(
-                    masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn
+                    masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn,
+                    unmask_response=unmask,
                 ),
                 media_type="text/event-stream",
             )
         result = await forward_complete(
-            masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn
+            masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn,
+            unmask_response=unmask,
         )
         return JSONResponse(result)
     except Exception as exc:

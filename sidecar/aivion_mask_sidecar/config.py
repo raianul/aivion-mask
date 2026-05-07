@@ -16,6 +16,7 @@ _DEFAULT_TOML = """\
 port = 47474
 session_ttl_hours = 8
 idle_shutdown_minutes = 0
+unmask_response = true
 
 [llm]
 api_base = "https://api.openai.com/v1"
@@ -27,6 +28,7 @@ class SidecarSettings:
     port: int = 47474
     session_ttl_hours: int = 8
     idle_shutdown_minutes: int = 0
+    unmask_response: bool = True
 
 @dataclass
 class LLMSettings:
