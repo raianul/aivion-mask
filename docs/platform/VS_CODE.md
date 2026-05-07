@@ -43,7 +43,7 @@ No sidecar needed. No `apiBase` config. Ships in Phase 0.
 
 ### Mode B — Proxy (full round-trip, zero config change for Continue/MCP-aware tools)
 
-sheru-mask exposes itself as an **MCP server**. Continue.dev and other MCP-aware tools discover it automatically — no manual `apiBase` change needed.
+aivion-mask exposes itself as an **MCP server**. Continue.dev and other MCP-aware tools discover it automatically — no manual `apiBase` change needed.
 
 Also supports manual `apiBase` config for tools that don't support MCP:
 
@@ -51,10 +51,10 @@ Also supports manual `apiBase` config for tools that don't support MCP:
 // Continue (~/.continue/config.json)
 {
   "models": [{
-    "title": "GPT-4o via sheru-mask",
+    "title": "GPT-4o via aivion-mask",
     "provider": "openai",
     "model": "gpt-4o",
-    "apiBase": "http://localhost:8003/v1/openai",
+    "apiBase": "http://localhost:47474/v1",
     "apiKey": "sk-mask-local"
   }]
 }
@@ -63,7 +63,7 @@ Also supports manual `apiBase` config for tools that don't support MCP:
 ```json
 // Cursor (settings.json)
 {
-  "cursor.openaiApiBase": "http://localhost:8003/v1/openai"
+  "cursor.openaiApiBase": "http://localhost:47474/v1"
 }
 ```
 
@@ -93,22 +93,30 @@ VS Code extension spawns the local sidecar automatically. Adds:
 VS Code Extension (TypeScript)
   ├── extension.ts          Activation, sidecar lifecycle manager
   ├── clipboard.ts          Clipboard monitor (Mode A — warn/block)
+  ├── sidecar.ts            Sidecar install + process lifecycle (NEW — Phase 1)
   ├── statusBar.ts          Entity counter in status bar
   ├── decorator.ts          Inline gutter highlights for detected entities
   ├── liveScanner.ts        On file open/change — proactive detection
   └── commands.ts           Show session, clear session, toggle on/off
 
-Local Sidecar (Python — same binary as sheru-desktop)
+aivion-mask Sidecar (Python — machine-level service, port 47474)
   ├── main.py               FastAPI app — OpenAI-compatible proxy + MCP server
   ├── masker.py             Presidio analyzer + anonymizer
   ├── session.py            SQLite session store (TTL, CRUD)
-  ├── deterministic.py      Workspace-level persistent token map (optional)
-  ├── policy.py             Developer policy entity config
-  ├── trainer.py            False-positive exclusion store
-  └── proxy.py              Forward masked request to real LLM provider
+  ├── tokens.py             __P1__ token generation per session
+  ├── stream.py             SSE lookahead buffer (unscrub across chunk boundaries)
+  ├── proxy.py              Forward masked request to real LLM provider
+  ├── mcp.py                MCP manifest endpoint
+  └── config.py             ~/.aivion-mask/config.toml loader
+
+~/.aivion-mask/
+  ├── config.toml           apiBase, apiKey, port, session TTL
+  ├── sessions.db           SQLite — token maps with TTL
+  ├── sidecar.pid           PID file — prevents duplicate sidecar processes
+  └── venv/                 Python venv (auto-created on first install)
 ```
 
-The sidecar is the same Python binary used in sheru-desktop. Shared codebase, different entry point.
+The sidecar is a **machine-level service** — not tied to VS Code. Any client (VS Code extension, browser extension, CLI) that installs first sets it up. Subsequent clients connect to the already-running process.
 
 ---
 
@@ -209,23 +217,36 @@ Learned exclusions stored in `~/.sheru-mask/trainer.json`. Exportable and sharea
 
 ## 9. Sidecar Lifecycle
 
-The VS Code extension manages the sidecar process:
+The sidecar is a **machine-level service**. Whichever client installs first sets it up. All subsequent clients just connect.
 
 ```
-VS Code opens
-  → Extension activates
-  → Check: is sidecar running? (GET http://localhost:8003/health)
-  → No → spawn sidecar process
-  → Yes → attach to existing (sheru-desktop may already be running it)
-  → Show status bar item: "sheru-mask: active"
+Any client activates (VS Code extension, browser extension, CLI)
+  → Check: is sidecar running? (GET http://localhost:47474/health)
+  → No → install sidecar if needed, then spawn it
+  → Yes → attach to existing process (PID from ~/.aivion-mask/sidecar.pid)
+  → Register as system service so it auto-starts on login
 
-VS Code closes
-  → Extension deactivates
-  → If extension started the sidecar → send SIGTERM
-  → If sidecar was already running (sheru-desktop) → leave it running
+VS Code closes (or any client disconnects)
+  → Do NOT stop the sidecar — other clients may be using it
+  → Sidecar keeps running until machine shutdown or manual stop
 ```
 
-If sheru-desktop is installed, the sidecar is already running — the VS Code extension just attaches. Single process, shared sessions.
+**System service registration (on first install):**
+- macOS: `launchd` plist in `~/Library/LaunchAgents/`
+- Linux: `systemd` user service
+- Windows: Task Scheduler entry
+
+**VS Code extension responsibility (Phase 1):**
+- Check if sidecar is running on activate
+- If not: install venv + pip install + spawn + register system service
+- Never stop the sidecar on deactivate
+- Show status bar: "Aivion Mask: active (:47474)"
+
+**Multiple clients, one process:**
+- VS Code extension → connects to `:47474`
+- Browser extension → connects to `:47474` (Native Messaging triggers install if needed)
+- CLI → connects to `:47474`
+- All share the same SQLite session store
 
 ---
 
@@ -299,21 +320,26 @@ In server mode:
 
 ## 14. Phases
 
-### Phase 0 — Clipboard Guard (1 week, works everywhere)
-- [ ] Clipboard monitor (TypeScript, no sidecar needed)
-- [ ] Warn mode: notification when secrets detected
-- [ ] Block mode: silently replace clipboard with masked text
-- [ ] 38+ regex patterns for credential types (port from SecretShields patterns)
-- [ ] VS Code Marketplace submission
+### Phase 0 — Clipboard Guard ✅ shipped (v0.1.1)
+- [x] Clipboard monitor (TypeScript, no sidecar needed)
+- [x] Warn mode: notification when secrets detected
+- [x] Block mode: silently replace clipboard with masked text
+- [x] 40+ regex patterns for credential types (42 patterns shipped)
+- [x] VS Code Marketplace submission (publisher: raianul, `aivion-mask-vscode`)
 
-### Phase 1 — Proxy Mode + MCP Server
-- [ ] Python sidecar: FastAPI OpenAI-compatible proxy on `localhost:8003`
-- [ ] MCP server endpoint for auto-discovery by Continue and MCP-aware tools
-- [ ] Presidio NER with developer policy
-- [ ] SQLite session store with TTL
-- [ ] `__P1__` token generation + unscrub on response
+### Phase 1 — Machine-Level Sidecar + Proxy Mode + MCP Server
+- [ ] Python sidecar: FastAPI OpenAI-compatible proxy on `localhost:47474`
+- [ ] Machine-level service: auto-start on login (launchd / systemd / Task Scheduler)
+- [ ] PID file (`~/.aivion-mask/sidecar.pid`) — prevents duplicate processes
+- [ ] CORS configured for VS Code extension, `chrome-extension://`, `moz-extension://`, localhost
+- [ ] Presidio NER with developer policy (credentials + secrets)
+- [ ] SQLite session store with TTL (`~/.aivion-mask/sessions.db`)
+- [ ] `__P1__` token generation + SSE lookahead buffer for streaming unscrub
+- [ ] MCP server endpoint (`GET /mcp`) for auto-discovery by Continue and MCP-aware tools
+- [ ] VS Code extension: `sidecar.ts` — install venv, spawn, health-check, register system service
+- [ ] `~/.aivion-mask/config.toml` for apiBase, apiKey, port, session TTL
 - [ ] Continue + Cursor integration docs
-- [ ] `~/.sheru-mask/config.toml` for real API key + provider config
+- [ ] `core/recognizers/` — move TypeScript patterns here (shared with browser extension)
 
 ### Phase 2 — VS Code Extension (deep integration)
 - [ ] Extension scaffold (TypeScript, manifest)

@@ -331,31 +331,42 @@ const restored = await client.unmask({ text: llmResponse, sessionId })
 ## 12. Repository Structure
 
 ```
-sheru-mask/
-  pii_service/
-    main.py          FastAPI app — routes
-    masker.py        Presidio analyzer + anonymizer integration
-    session.py       Valkey-backed session store (TTL, CRUD)
-    policy.py        Policy registry — entity configs per org/role
-    auth.py          API key verification
-    audit.py         Audit event writer
-    tokens.py        Token generation + display_value mapping
-    config.py        Settings from env
+aivion-mask/
+  core/
+    recognizers/     Shared TypeScript credential patterns (VS Code + browser extension)
+  sidecar/           Machine-level local service (Python)
+    aivion_mask_sidecar/
+      main.py        FastAPI app — port 47474
+      masker.py      Presidio analyzer + anonymizer
+      session.py     SQLite session store (TTL, CRUD)
+      tokens.py      __P1__ token generation per session
+      stream.py      SSE lookahead buffer for streaming unscrub
+      proxy.py       Forward masked request to real LLM
+      mcp.py         MCP manifest endpoint
+      config.py      ~/.aivion-mask/config.toml loader
+    pyproject.toml
+  extension/
+    vscode/          VS Code extension (Phase 0 shipped, Phase 1 in progress)
+    browser/         Chrome/Firefox extension (scaffold)
   sdk/
-    python/          pip install sheru-mask
+    python/          pip install aivion-mask
     typescript/      npm install @aivion/mask
-  doc/
-    PLAN.md          This file
-  docker-compose.yml Presidio analyzer + anonymizer + Valkey + service
-  Dockerfile
+  docs/
+    platform/        Per-platform specs (this directory)
   pyproject.toml
   CLAUDE.md
 ```
 
-**External services (all local, no internet):**
-- `presidio-analyzer` — entity detection, port 5002
-- `presidio-anonymizer` — token replacement, port 5001
-- `Valkey/Redis` — session store, port 6379
+**Data directory (local machine, never synced):**
+```
+~/.aivion-mask/
+  config.toml        apiBase, apiKey, port, session TTL
+  sessions.db        SQLite — token maps with TTL
+  sidecar.pid        PID file — prevents duplicate processes
+  venv/              Python venv (auto-created on first install)
+```
+
+**No external services required.** Presidio runs embedded in the sidecar process (no separate containers needed for local use). Docker compose is provided for self-hosted team/enterprise deployments only.
 
 ---
 
@@ -364,7 +375,7 @@ sheru-mask/
 ### Self-hosted (Docker)
 ```bash
 docker compose up
-# pii service     → :8003
+# pii service     → :47474
 # presidio-analyzer → :5002
 # presidio-anonymizer → :5001
 # valkey          → :6379

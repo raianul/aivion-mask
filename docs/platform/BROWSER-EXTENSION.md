@@ -50,22 +50,54 @@ Zero network calls to sheru-mask servers. Fully air-gapped.
 ```
 Browser Extension
   ├── content_script.js     DOM interception per supported site
-  ├── background.js         Service worker — session coordinator
-  ├── popup/                Settings UI (policy selector, entity toggles)
+  ├── background.js         Service worker — sidecar check + session coordinator
+  ├── native/               Native Messaging host manifest (triggers sidecar install)
+  ├── popup/                Settings UI (policy selector, entity toggles, sidecar status)
   └── lib/
-       ├── ner.js           ONNX runtime + model inference
-       ├── session.js       IndexedDB read/write (token map + TTL)
+       ├── sidecar.js       Connect to localhost:47474 — primary detection path
+       ├── ner.js           ONNX runtime + model inference — fallback if no sidecar
+       ├── session.js       IndexedDB read/write (token map + TTL) — fallback only
        ├── masker.js        Token generation + display_value mapping
        └── unmasker.js      Token → original lookup
 ```
 
-**NER model:** ONNX export of a distilBERT NER model fine-tuned on PII entities. Runs entirely in-browser via `onnxruntime-web`. ~40MB model download, cached after first install.
+**Detection strategy — sidecar-first:**
+```
+Extension activates
+  → Check: is sidecar running? (GET http://localhost:47474/health)
+  → Yes → use sidecar for all mask/unmask (Presidio NER, shared SQLite sessions)
+  → No  → prompt user to install sidecar OR fall back to ONNX in-browser
+```
 
-**Session store:** IndexedDB — survives page reloads, scoped per browser profile.
+**Sidecar mode (preferred):** Delegates to `localhost:47474`. No ONNX model download. Better accuracy. Sessions shared with VS Code extension — entity masked in VS Code is known to the browser extension.
 
-**Token format:** Same as server: `__P1__`, `__P2__` — 5-7 chars, streaming-safe.
+**ONNX fallback mode:** ONNX export of a distilBERT NER model, runs in-browser via `onnxruntime-web`. ~40MB model download, cached after first install. IndexedDB for sessions.
+
+**Session store:** SQLite via sidecar (preferred) or IndexedDB (fallback). Survives page reloads.
+
+**Token format:** `__P1__`, `__P2__` — 5-7 chars, streaming-safe. Same format as sidecar.
 
 **Display values:** `[Name]`, `[Email]`, `[SSN]` shown to user during streaming. Full originals restored after response completes.
+
+---
+
+## 3a. Sidecar Installation from Browser Extension
+
+Browser extensions cannot install system software directly. The standard approach is **Native Messaging**:
+
+```
+User installs browser extension (no VS Code, no sidecar)
+  → Extension checks GET http://localhost:47474/health → fails
+  → Background.js tries chrome.runtime.connectNative('com.aivionlabs.mask')
+  → Native host not registered → show onboarding banner:
+    "Install Aivion Mask local service for full protection (1-click)"
+  → User clicks → downloads platform installer (pkg / deb / exe)
+  → Installer: sets up Python venv, registers launchd/systemd/Task Scheduler
+  → Installer also registers Native Messaging host manifest
+  → Extension detects sidecar is now running → switches to sidecar mode
+```
+
+**Installer is a separate deliverable** (`aivion-mask-installer`) — not bundled in the browser extension package. The extension just links to the download.
 
 ---
 
@@ -180,11 +212,13 @@ This bridges the consumer extension into the enterprise API product. Same extens
 ### Phase 1 — Core Extension
 - [ ] Chrome extension manifest v3
 - [ ] Content scripts for ChatGPT, Claude, Gemini
-- [ ] ONNX NER model (distilBERT, 5 entity types: PERSON, EMAIL, PHONE, LOCATION, SSN)
-- [ ] IndexedDB session store with TTL
+- [ ] Sidecar-first detection: connect to `localhost:47474` if running
+- [ ] Native Messaging host check + onboarding banner if sidecar not installed
+- [ ] ONNX NER fallback (distilBERT, 5 entity types: PERSON, EMAIL, PHONE, LOCATION, SSN)
+- [ ] IndexedDB session store with TTL (fallback mode only)
 - [ ] `__P1__` token generation + display value substitution
 - [ ] Streaming-safe unmask (safe_flush_point buffer)
-- [ ] Popup UI — policy selector, on/off toggle per site
+- [ ] Popup UI — policy selector, on/off toggle per site, sidecar status indicator
 - [ ] Chrome Web Store submission
 
 ### Phase 2 — More Platforms + Entities
