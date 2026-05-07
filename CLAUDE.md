@@ -6,7 +6,8 @@ Local-first PII masking layer for LLM applications. Masks sensitive data before 
 
 | Path | What it is | Status |
 |---|---|---|
-| `core/recognizers/` | Shared regex + NER recognizer patterns | scaffold |
+| `core/recognizers/` | Shared regex + NER recognizer patterns | shared credential pattern library |
+| `sidecar/` | Local FastAPI proxy — masks PII before LLM, restores in response | Phase 1 |
 | `extension/vscode/` | VS Code extension (clipboard guard → proxy → deep integration) | Phase 0 shipped (v0.1.1) |
 | `extension/browser/` | Chrome/Firefox extension for AI chat UIs | scaffold |
 | `sdk/python/` | `pip install aivion-mask` | scaffold |
@@ -45,6 +46,16 @@ npx vsce publish --pat <token>                     # publish (publisher: raianul
 npx vsce publish patch --pat <token>               # bump patch + publish
 ```
 
+## Sidecar Commands
+
+```bash
+cd sidecar
+python3 -m venv .venv && source .venv/bin/activate
+pip install -e ".[dev]"          # install + dev deps
+pytest -v                        # run all sidecar tests
+aivion-mask-sidecar              # start sidecar on :47474
+```
+
 ## Key Design Invariants
 
 - **No LLM calls inside the masking layer.** Detection is pure Presidio/spaCy + regex.
@@ -69,7 +80,7 @@ See `doc/platform/` for detailed per-platform specs.
 - `doc/platform/BROWSER-EXTENSION.md` — browser extension
 - `doc/platform/MOBILE.md` — mobile
 
-Current state: Phase 0 (VS Code clipboard guard) shipped — live at `raianul.aivion-mask-vscode` on the marketplace. All other directories are scaffold.
+Current state: Phase 1 (sidecar + proxy + VS Code integration) complete. Phase 0 clipboard guard live at `raianul.aivion-mask-vscode` on the marketplace. Browser extension and SDKs are scaffold.
 
 ## Gotchas
 
