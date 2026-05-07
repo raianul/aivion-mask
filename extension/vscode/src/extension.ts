@@ -2,6 +2,7 @@ import * as vscode from 'vscode'
 import { ClipboardMonitor } from './clipboard'
 import { MaskStatusBar } from './statusBar'
 import { registerCommands } from './commands'
+import { SidecarManager, SIDECAR_PORT } from './sidecar'
 
 let monitor: ClipboardMonitor | undefined
 let statusBar: MaskStatusBar | undefined
@@ -59,6 +60,11 @@ export function activate(context: vscode.ExtensionContext): void {
       statusBar?.setDisabled()
       void vscode.window.showInformationMessage('Aivion Mask: disabled')
     }
+  })
+
+  const sidecarManager = new SidecarManager()
+  void sidecarManager.ensureRunning().then((running) => {
+    if (running) statusBar?.setProxyActive(SIDECAR_PORT)
   })
 
   // Restart monitor if poll interval config changes

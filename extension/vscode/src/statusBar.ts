@@ -10,6 +10,13 @@ export class MaskStatusBar {
     this.item.show()
   }
 
+  setProxyActive(port: number): void {
+    this.item.text = `$(shield) aivion-mask: proxy :${port}`
+    this.item.tooltip = `Aivion Mask active — proxy on localhost:${port}`
+    this.item.backgroundColor = undefined
+    this.item.color = undefined
+  }
+
   setActive(): void {
     this.item.text = '$(shield) aivion-mask'
     this.item.tooltip = 'Aivion Mask active — click to toggle off'
