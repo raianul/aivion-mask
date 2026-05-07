@@ -44,6 +44,11 @@ def entity_abbrev(entity_type: str) -> str:
     return _ABBREV.get(entity_type, entity_type[:3].upper())
 
 
+def register_abbrev(entity_type: str, abbrev: str) -> None:
+    """Register a custom abbreviation for an entity type."""
+    _ABBREV[entity_type] = abbrev.upper()
+
+
 def make_token(entity_type: str, index: int) -> str:
     return f"__{entity_abbrev(entity_type)}{index}__"
 

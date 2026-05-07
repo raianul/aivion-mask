@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .config import load_config, Config
-from .masker import mask_message
+from .masker import mask_message, register_custom_patterns
 from .mcp import get_manifest
 from .proxy import forward_complete, forward_streaming
 from .session import cleanup_expired, delete_session, init_db
@@ -21,6 +21,7 @@ _conn = None
 async def lifespan(app: FastAPI):
     global _config, _conn
     _config = load_config()
+    register_custom_patterns(_config.sidecar.custom_patterns)
     _conn = init_db()
     task = asyncio.create_task(_cleanup_loop())
     yield

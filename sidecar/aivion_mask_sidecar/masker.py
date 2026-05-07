@@ -5,9 +5,23 @@ import sqlite3
 from dataclasses import dataclass
 
 from .session import get_token, next_index, save_token, get_all_mappings
-from .tokens import entity_abbrev, make_token
+from .tokens import entity_abbrev, make_token, register_abbrev
 
 _log = logging.getLogger(__name__)
+
+
+def register_custom_patterns(entries: list) -> None:
+    """Extend _PATTERNS with user-defined regexes from config. Call once at startup."""
+    for entry in entries:
+        try:
+            compiled = re.compile(entry.pattern)
+        except re.error as exc:
+            _log.warning("Skipping invalid custom pattern %r: %s", entry.name, exc)
+            continue
+        _PATTERNS.append((entry.name, compiled))
+        if entry.abbrev:
+            register_abbrev(entry.name, entry.abbrev)
+        _log.info("[CUSTOM PATTERN] registered %s → __%s{n}__", entry.name, entity_abbrev(entry.name))
 
 
 @dataclass

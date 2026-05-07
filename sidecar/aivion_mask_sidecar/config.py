@@ -18,10 +18,22 @@ session_ttl_hours = 8
 idle_shutdown_minutes = 0
 unmask_response = true
 
+# Add custom regex patterns below. Example:
+# [[sidecar.custom_patterns]]
+# name = "MY_INTERNAL_TOKEN"
+# pattern = 'int_[A-Za-z0-9]{32}'
+# abbrev = "INT"   # optional — token becomes __INT1__, __INT2__, etc.
+
 [llm]
 api_base = "https://api.openai.com/v1"
 api_key = ""
 """
+
+@dataclass
+class CustomPattern:
+    name: str
+    pattern: str
+    abbrev: str = ""  # if empty, derived from name (first 3 chars uppercase)
 
 @dataclass
 class SidecarSettings:
@@ -29,6 +41,7 @@ class SidecarSettings:
     session_ttl_hours: int = 8
     idle_shutdown_minutes: int = 0
     unmask_response: bool = True
+    custom_patterns: list[CustomPattern] = field(default_factory=list)
 
 @dataclass
 class LLMSettings:
@@ -48,6 +61,9 @@ def load_config() -> Config:
         return Config()
     with open(CONFIG_PATH, "rb") as f:
         data = tomllib.load(f)
-    sidecar = SidecarSettings(**data.get("sidecar", {}))
+    sidecar_data = dict(data.get("sidecar", {}))
+    raw_patterns = sidecar_data.pop("custom_patterns", [])
+    sidecar = SidecarSettings(**sidecar_data)
+    sidecar.custom_patterns = [CustomPattern(**p) for p in raw_patterns]
     llm = LLMSettings(**data.get("llm", {}))
     return Config(sidecar=sidecar, llm=llm)
