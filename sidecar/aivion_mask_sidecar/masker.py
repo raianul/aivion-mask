@@ -1,10 +1,13 @@
 from __future__ import annotations
+import logging
 import re
 import sqlite3
 from dataclasses import dataclass
 
 from .session import get_token, next_index, save_token, get_all_mappings
-from .tokens import make_token
+from .tokens import entity_abbrev, make_token
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -94,8 +97,11 @@ def mask_message(
     for entity in entities:
         token = get_token(conn, session_id, entity.value)
         if token is None:
-            idx = next_index(conn, session_id)
-            token = make_token(idx)
+            abbrev = entity_abbrev(entity.entity_type)
+            idx = next_index(conn, session_id, abbrev)
+            token = make_token(entity.entity_type, idx)
             save_token(conn, session_id, token, entity.value, idx, ttl_hours)
+            preview = entity.value[:12] + ("..." if len(entity.value) > 12 else "")
+            _log.info("[MASKED] %s → %s  (%s)", entity.entity_type, token, preview)
         text = text[: entity.start] + token + text[entity.end :]
     return text

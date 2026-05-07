@@ -3,9 +3,9 @@ import re
 
 from .tokens import replace_tokens
 
-# Matches a trailing suffix that could be the start of an incomplete __Pn__ token.
-_PARTIAL_RE = re.compile(r'_[_P\d]*$')
-_TOKEN_RE = re.compile(r'__P\d+__')
+# Matches a trailing suffix that could be the start of an incomplete type-specific token.
+_PARTIAL_RE = re.compile(r'_[_A-Z\d]*_?$')
+_TOKEN_RE = re.compile(r'__[A-Z]{2,6}\d+__')
 
 
 def split_at_safe_point(text: str) -> tuple[str, str]:

@@ -8,14 +8,14 @@ from aivion_mask_sidecar.session import init_db, save_token
 @pytest.fixture
 def conn(tmp_path):
     c = init_db(tmp_path / "t.db")
-    save_token(c, "s1", "__P1__", "secret123", 1, ttl_hours=8)
+    save_token(c, "s1", "__DB1__", "secret123", 1, ttl_hours=8)
     yield c
     c.close()
 
 @respx.mock
 @pytest.mark.asyncio
 async def test_forward_complete_unscrubs(conn):
-    body = {"choices": [{"message": {"role": "assistant", "content": "the value is __P1__ ok"}}]}
+    body = {"choices": [{"message": {"role": "assistant", "content": "the value is __DB1__ ok"}}]}
     respx.post("https://api.openai.com/v1/chat/completions").mock(
         return_value=httpx.Response(200, json=body)
     )
@@ -48,7 +48,7 @@ async def test_forward_complete_passes_auth_header(conn):
 @pytest.mark.asyncio
 async def test_forward_streaming_unscrubs(conn):
     chunks = [
-        'data: {"choices":[{"delta":{"content":"value is __P"},"index":0}]}\n\n',
+        'data: {"choices":[{"delta":{"content":"value is __DB"},"index":0}]}\n\n',
         'data: {"choices":[{"delta":{"content":"1__ ok"},"index":0}]}\n\n',
         "data: [DONE]\n\n",
     ]
@@ -68,4 +68,4 @@ async def test_forward_streaming_unscrubs(conn):
 
     full = "".join(collected)
     assert "secret123" in full
-    assert "__P1__" not in full
+    assert "__DB1__" not in full

@@ -39,12 +39,21 @@ def get_token(conn: sqlite3.Connection, session_id: str, original: str) -> str |
     ).fetchone()
     return row[0] if row else None
 
-def next_index(conn: sqlite3.Connection, session_id: str) -> int:
-    row = conn.execute(
-        "SELECT MAX(token_index) FROM sessions WHERE session_id=?",
-        (session_id,),
-    ).fetchone()
-    return (row[0] or 0) + 1
+def next_index(conn: sqlite3.Connection, session_id: str, entity_abbrev: str) -> int:
+    """Return the next available index for the given abbreviation within this session."""
+    rows = conn.execute(
+        "SELECT token FROM sessions WHERE session_id=? AND expires_at>?",
+        (session_id, int(time.time())),
+    ).fetchall()
+    prefix = f"__{entity_abbrev}"
+    max_idx = 0
+    for (token,) in rows:
+        if token.startswith(prefix) and token.endswith("__"):
+            try:
+                max_idx = max(max_idx, int(token[len(prefix):-2]))
+            except ValueError:
+                pass
+    return max_idx + 1
 
 def save_token(
     conn: sqlite3.Connection,

@@ -104,6 +104,8 @@ async def chat_completions(request: Request):
 
 
 def run() -> None:
+    import logging
     import uvicorn
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     cfg = load_config()
     uvicorn.run("aivion_mask_sidecar.main:app", host="127.0.0.1", port=cfg.sidecar.port)

@@ -54,7 +54,17 @@ def conn(tmp_path):
 def test_mask_message_assigns_token(conn):
     result = mask_message("key=AKIA" + "A" * 16 + " text", conn, "s1", 8)
     assert "AKIA" + "A" * 16 not in result
-    assert "__P1__" in result
+    assert "__AWS1__" in result
+
+def test_mask_message_database_url_token(conn):
+    result = mask_message("postgresql://user:pass@localhost:5432/mydb", conn, "s1", 8)
+    assert "postgresql" not in result
+    assert "__DB1__" in result
+
+def test_mask_message_type_specific_abbrev(conn):
+    # GitHub token uses GH abbreviation
+    result = mask_message("token: ghp_" + "A" * 36, conn, "s1", 8)
+    assert "__GH1__" in result
 
 def test_mask_message_same_value_same_token(conn):
     r1 = mask_message("AKIA" + "A" * 16, conn, "s1", 8)
@@ -62,12 +72,28 @@ def test_mask_message_same_value_same_token(conn):
     assert r1 == r2  # same token assigned
 
 def test_mask_message_pre_redacts_known_entities(conn):
-    # First message — assigns __P1__
+    # First message — assigns __AWS1__
     mask_message("key=AKIA" + "A" * 16, conn, "s1", 8)
     # Second message mentions same value — should pre-redact without re-detecting
     result = mask_message("the key is AKIA" + "A" * 16 + " again", conn, "s1", 8)
     assert "AKIA" + "A" * 16 not in result
-    assert "__P1__" in result
+    assert "__AWS1__" in result
 
 def test_mask_message_no_entities_unchanged(conn):
     assert mask_message("hello world", conn, "s1", 8) == "hello world"
+
+def test_mask_message_per_type_counter(conn):
+    # Two different GitHub tokens get GH1 and GH2
+    t1 = "ghp_" + "A" * 36
+    t2 = "ghp_" + "B" * 36
+    r1 = mask_message(t1, conn, "s1", 8)
+    r2 = mask_message(t2, conn, "s1", 8)
+    assert "__GH1__" in r1
+    assert "__GH2__" in r2
+
+def test_mask_message_different_types_independent_counters(conn):
+    # AWS and DB each start at index 1 independently
+    aws_result = mask_message("AKIA" + "A" * 16, conn, "s1", 8)
+    db_result = mask_message("postgresql://user:pass@localhost/db", conn, "s1", 8)
+    assert "__AWS1__" in aws_result
+    assert "__DB1__" in db_result

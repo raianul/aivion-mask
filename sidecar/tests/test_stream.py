@@ -8,7 +8,7 @@ def test_no_underscores():
 
 
 def test_complete_token_at_end():
-    assert split_at_safe_point("value __P1__") == ("value __P1__", "")
+    assert split_at_safe_point("value __DB1__") == ("value __DB1__", "")
 
 
 def test_partial_double_underscore():
@@ -17,28 +17,28 @@ def test_partial_double_underscore():
     assert hold == "__"
 
 
-def test_partial_with_P():
-    safe, hold = split_at_safe_point("value __P")
+def test_partial_with_letters():
+    safe, hold = split_at_safe_point("value __DB")
     assert safe == "value "
-    assert hold == "__P"
+    assert hold == "__DB"
 
 
 def test_partial_with_number():
-    safe, hold = split_at_safe_point("value __P42")
+    safe, hold = split_at_safe_point("value __DB42")
     assert safe == "value "
-    assert hold == "__P42"
+    assert hold == "__DB42"
 
 
 def test_partial_closing_underscore():
-    safe, hold = split_at_safe_point("value __P1_")
+    safe, hold = split_at_safe_point("value __DB1_")
     assert safe == "value "
-    assert hold == "__P1_"
+    assert hold == "__DB1_"
 
 
 def test_complete_then_partial():
-    safe, hold = split_at_safe_point("__P1__ and __P")
-    assert safe == "__P1__ and "
-    assert hold == "__P"
+    safe, hold = split_at_safe_point("__DB1__ and __GH")
+    assert safe == "__DB1__ and "
+    assert hold == "__GH"
 
 
 def test_text_with_underscores_not_token():
@@ -51,40 +51,40 @@ def test_text_with_underscores_not_token():
 
 
 def test_passthrough_no_tokens():
-    buf = LookaheadBuffer({"__P1__": "secret"})
+    buf = LookaheadBuffer({"__DB1__": "secret"})
     assert buf.push("hello world") == "hello world"
     assert buf.flush() == ""
 
 
 def test_replaces_complete_token():
-    buf = LookaheadBuffer({"__P1__": "secret"})
-    assert buf.push("value is __P1__ done") == "value is secret done"
+    buf = LookaheadBuffer({"__DB1__": "postgresql://user:pass@host/db"})
+    assert buf.push("value is __DB1__ done") == "value is postgresql://user:pass@host/db done"
 
 
 def test_handles_split_token():
-    buf = LookaheadBuffer({"__P1__": "secret"})
-    out1 = buf.push("value is __P")
+    buf = LookaheadBuffer({"__DB1__": "secret"})
+    out1 = buf.push("value is __DB")
     out2 = buf.push("1__ done")
     assert out1 == "value is "  # held back partial
     assert out2 == "secret done"  # flushed once complete
 
 
 def test_flush_releases_remainder():
-    buf = LookaheadBuffer({"__P1__": "secret"})
-    buf.push("value __P1")  # partial held back
+    buf = LookaheadBuffer({"__DB1__": "secret"})
+    buf.push("value __DB1")  # partial held back
     remainder = buf.flush()
-    # At flush time the buffer holds "__P1" which is not a complete token
+    # At flush time the buffer holds "__DB1" which is not a complete token
     # replace_tokens won't match it, so it passes through as-is
-    assert remainder == "__P1"
+    assert remainder == "__DB1"
 
 
 def test_multiple_tokens_in_sequence():
-    buf = LookaheadBuffer({"__P1__": "alice", "__P2__": "bob"})
-    result = buf.push("__P1__ met __P2__")
-    assert result == "alice met bob"
+    buf = LookaheadBuffer({"__GH1__": "ghp_token", "__DB1__": "postgresql://..."})
+    result = buf.push("__GH1__ used __DB1__")
+    assert result == "ghp_token used postgresql://..."
 
 
 def test_flush_empty_after_complete_push():
-    buf = LookaheadBuffer({"__P1__": "secret"})
-    buf.push("value is __P1__ done")
+    buf = LookaheadBuffer({"__DB1__": "secret"})
+    buf.push("value is __DB1__ done")
     assert buf.flush() == ""
