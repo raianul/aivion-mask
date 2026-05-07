@@ -11,6 +11,11 @@ else:
 AIVION_DIR = Path.home() / ".aivion-mask"
 CONFIG_PATH = AIVION_DIR / "config.toml"
 
+DEFAULT_UPSTREAMS: dict[str, str] = {
+    "/v1/messages":         "https://api.anthropic.com",
+    "/v1/chat/completions": "https://api.openai.com/v1",
+}
+
 _DEFAULT_TOML = """\
 [sidecar]
 port = 47474

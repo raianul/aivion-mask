@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
+from .anthropic import forward_complete_anthropic, forward_streaming_anthropic, walk_request
 from .config import load_config, Config
 from .masker import mask_message, register_custom_patterns
 from .mcp import get_manifest
@@ -100,6 +101,47 @@ async def chat_completions(request: Request):
         result = await forward_complete(
             masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn,
             unmask_response=unmask,
+        )
+        return JSONResponse(result)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Upstream LLM unreachable: {exc}") from exc
+
+
+@app.post("/v1/messages")
+async def messages(request: Request):
+    body = await request.json()
+    session_id = (
+        request.headers.get("X-Aivion-Session")
+        or str(uuid.uuid4())
+    )
+
+    upstream_headers: dict[str, str] = {}
+    for h in ("Authorization", "x-api-key", "anthropic-version", "anthropic-beta"):
+        v = request.headers.get(h)
+        if v is not None:
+            upstream_headers[h] = v
+    upstream_headers["Content-Type"] = "application/json"
+
+    if not upstream_headers.get("Authorization") and not upstream_headers.get("x-api-key"):
+        raise HTTPException(
+            status_code=401,
+            detail="No auth provided. Send Authorization: Bearer <token> or x-api-key.",
+        )
+
+    ttl = _config.sidecar.session_ttl_hours
+    unmask = _config.sidecar.unmask_response
+
+    try:
+        masked_body = await walk_request(body, _conn, session_id, ttl)
+        if body.get("stream", False):
+            return StreamingResponse(
+                forward_streaming_anthropic(
+                    masked_body, upstream_headers, session_id, _conn, unmask_response=unmask
+                ),
+                media_type="text/event-stream",
+            )
+        result = await forward_complete_anthropic(
+            masked_body, upstream_headers, session_id, _conn, unmask_response=unmask
         )
         return JSONResponse(result)
     except Exception as exc:
