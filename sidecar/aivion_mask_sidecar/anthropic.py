@@ -14,7 +14,6 @@ _log = logging.getLogger(__name__)
 
 ANTHROPIC_UPSTREAM = "https://api.anthropic.com"
 
-
 async def _walk_json_async(obj, conn, session_id: str, ttl_hours: int):
     """Recursively mask string leaves in a JSON-like object."""
     if isinstance(obj, str):

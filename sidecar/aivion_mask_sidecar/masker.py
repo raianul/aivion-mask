@@ -74,6 +74,17 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # Entity types that get structural (per-component) masking instead of whole-value replacement
 _URL_TYPES = {"DATABASE_URL", "DATABASE_URL_REDIS", "URL_WITH_CREDENTIALS"}
 
+# Token abbreviations for URL components — excluded from global pre-redaction because
+# their values (usernames, hostnames, db names) are too short/common to safely replace
+# everywhere. They still work for response unmasking.
+_URL_COMPONENT_ABBREVS = {"USER", "PASS", "HOST", "DB"}
+_URL_COMPONENT_TOKEN_RE = re.compile(r'^__([A-Z]{2,6})\d+__$')
+
+
+def _is_url_component_token(token: str) -> bool:
+    m = _URL_COMPONENT_TOKEN_RE.match(token)
+    return m is not None and m.group(1) in _URL_COMPONENT_ABBREVS
+
 
 async def _get_or_create_token(
     conn, session_id: str, value: str, entity_type: str, ttl_hours: int
@@ -151,10 +162,13 @@ async def mask_message(
     ttl_hours: int,
 ) -> str:
     """Pre-redact known entities, detect new ones, assign tokens, return masked text."""
-    # Step 1: replace known values with their tokens (prevents turn-3 leak)
+    # Step 1: replace known values with their tokens (prevents turn-3 leak).
+    # Skip URL component tokens — their values (usernames, hostnames, db names) are too
+    # short/generic to replace globally without corrupting unrelated text.
     mappings = await get_all_mappings(conn, session_id)  # {token: original}
     for token, original in mappings.items():
-        text = text.replace(original, token)
+        if not _is_url_component_token(token):
+            text = text.replace(original, token)
 
     # Step 2: detect new entities — CPU-bound regex runs in thread pool
     loop = asyncio.get_running_loop()

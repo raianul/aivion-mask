@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio
+import logging
 import uuid
 from contextlib import asynccontextmanager
 
@@ -21,6 +22,12 @@ _conn = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _config, _conn
+    _pkg_log = logging.getLogger("aivion_mask_sidecar")
+    _pkg_log.setLevel(logging.INFO)
+    if not _pkg_log.handlers:
+        _h = logging.StreamHandler()
+        _h.setFormatter(logging.Formatter("%(levelname)s:  %(name)s - %(message)s"))
+        _pkg_log.addHandler(_h)
     _config = load_config()
     register_custom_patterns(_config.sidecar.custom_patterns)
     _conn = await init_db()
@@ -135,6 +142,10 @@ async def messages(request: Request):
 
     ttl = _config.sidecar.session_ttl_hours
     unmask = _config.sidecar.unmask_response
+
+    _log = logging.getLogger("aivion_mask_sidecar.main")
+    _log.info("[REQUEST] session=%s model=%s stream=%s unmask=%s",
+              session_id[:8], body.get("model", "?"), body.get("stream", False), unmask)
 
     try:
         masked_body = await walk_request(body, _conn, session_id, ttl)
