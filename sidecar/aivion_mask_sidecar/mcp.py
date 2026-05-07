@@ -4,8 +4,8 @@ def get_manifest(port: int) -> dict:
         "version": "0.1.0",
         "description": "Local credential masking proxy — secrets never reach your LLM",
         "proxy": {
-            "url": f"http://localhost:{port}/v1",
+            "url": f"http://127.0.0.1:{port}/v1",
             "protocol": "openai",
         },
-        "health": f"http://localhost:{port}/health",
+        "health": f"http://127.0.0.1:{port}/health",
     }
