@@ -42,6 +42,7 @@ def load_config() -> Config:
     if not CONFIG_PATH.exists():
         AIVION_DIR.mkdir(parents=True, exist_ok=True)
         CONFIG_PATH.write_text(_DEFAULT_TOML)
+        CONFIG_PATH.chmod(0o600)
         return Config()
     with open(CONFIG_PATH, "rb") as f:
         data = tomllib.load(f)

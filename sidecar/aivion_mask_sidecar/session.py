@@ -24,7 +24,7 @@ def init_db(db_path: Path | None = None) -> sqlite3.Connection:
         from .config import AIVION_DIR
         db_path = AIVION_DIR / "sessions.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)  # single asyncio thread shares this conn
     conn.executescript(_SCHEMA)
     conn.commit()
     return conn
