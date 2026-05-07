@@ -67,6 +67,35 @@
           "minimum": 100,
           "maximum": 5000,
           "description": "How often to check the clipboard (milliseconds)"
+        },
+        "aivion-mask.llm.apiBase": {
+          "type": "string",
+          "default": "https://api.openai.com/v1",
+          "description": "LLM API base URL — any OpenAI-compatible endpoint (e.g. http://localhost:11434/v1 for Ollama)"
+        },
+        "aivion-mask.llm.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "LLM API key (stored in VS Code settings)"
+        },
+        "aivion-mask.sidecar.unmaskResponse": {
+          "type": "boolean",
+          "default": true,
+          "description": "Restore original values in LLM responses. Set to false to keep tokens like __DB1__ in the response."
+        },
+        "aivion-mask.sidecar.customPatterns": {
+          "type": "array",
+          "default": [],
+          "description": "Additional credential patterns to detect and mask",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name":    { "type": "string", "description": "Pattern identifier (e.g. MY_INTERNAL_TOKEN)" },
+              "pattern": { "type": "string", "description": "Regex pattern string" },
+              "abbrev":  { "type": "string", "description": "Token abbreviation — result is __ABBREV1__ (optional, defaults to first 3 chars of name)" }
+            },
+            "required": ["name", "pattern"]
+          }
         }
       }
     }

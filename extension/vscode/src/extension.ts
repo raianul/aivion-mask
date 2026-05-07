@@ -3,12 +3,15 @@ import { ClipboardMonitor } from './clipboard'
 import { MaskStatusBar } from './statusBar'
 import { registerCommands } from './commands'
 import { SidecarManager, SIDECAR_PORT } from './sidecar'
+import { syncConfig } from './config'
 
 let monitor: ClipboardMonitor | undefined
 let statusBar: MaskStatusBar | undefined
 let enabled = true
 
 export function activate(context: vscode.ExtensionContext): void {
+  syncConfig()
+
   const config = () => vscode.workspace.getConfiguration('aivion-mask')
 
   statusBar = new MaskStatusBar()
@@ -67,13 +70,19 @@ export function activate(context: vscode.ExtensionContext): void {
     if (running) statusBar?.setProxyActive(SIDECAR_PORT)
   })
 
-  // Restart monitor if poll interval config changes
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('aivion-mask.clipboard.pollIntervalMs') && enabled) {
         monitor?.stop()
         const intervalMs = config().get<number>('clipboard.pollIntervalMs', 500)
         monitor?.start(intervalMs)
+      }
+      if (
+        e.affectsConfiguration('aivion-mask.llm') ||
+        e.affectsConfiguration('aivion-mask.sidecar.unmaskResponse') ||
+        e.affectsConfiguration('aivion-mask.sidecar.customPatterns')
+      ) {
+        syncConfig()
       }
     })
   )
