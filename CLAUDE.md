@@ -12,7 +12,10 @@ Local-first PII masking layer for LLM applications. Masks sensitive data before 
 | `extension/browser/` | Chrome/Firefox extension for AI chat UIs | scaffold |
 | `sdk/python/` | `pip install aivion-mask` | scaffold |
 | `sdk/typescript/` | `npm install @aivion/mask` | scaffold |
-| `doc/platform/` | Product plans per platform | docs only |
+| `docs/dev-tool/` | Developer-tool roadmap (VS Code, browser extension, research) | docs only |
+| `docs/api/` | Scrubber-server SaaS API roadmap | docs only |
+| `docs/LLM/` | Per-provider coverage plans (Claude, OpenAI, ...) | docs only |
+| `docs/archived/` | Researched but not building (system tray, mobile) | docs only |
 
 ## Code Style
 
@@ -73,12 +76,23 @@ When adding a new pattern:
 
 ## Build Phases
 
-See `doc/platform/` for detailed per-platform specs.
+Two parallel product tracks share the same masking engine:
 
-- `doc/platform/PLAN.md` — core mask/unmask API service
-- `doc/platform/VS_CODE.md` — VS Code extension (Phase 0 = clipboard guard, no sidecar)
-- `doc/platform/BROWSER-EXTENSION.md` — browser extension
-- `doc/platform/MOBILE.md` — mobile
+**Developer tool** (this repo's primary focus)
+- `docs/dev-tool/VS_CODE.md` — VS Code extension (Phase 0 shipped, Phase 1 sidecar shipped, Phase 2 deep integration next)
+- `docs/dev-tool/BROWSER-EXTENSION.md` — Chrome/Firefox extension for ChatGPT, Claude.ai, Gemini, etc.
+- `docs/dev-tool/RESEARCH.md` — interception approaches, token format design, streaming, prior art
+
+**Per-provider coverage** (applies to both tracks)
+- `docs/LLM/CLAUDE.md` — Anthropic provider plan (auth pass-through, `/v1/messages`, SSE handler)
+- `docs/LLM/OPENAI.md`, `GEMINI.md`, ... (next)
+
+**Scrubber-server SaaS API** (separate product, future track)
+- `docs/api/PLAN.md` — multi-tenant `/v1/mask` + `/v1/unmask` API for app teams to integrate
+
+**Archived** (researched, not on the roadmap)
+- `docs/archived/MASK.md` — system-tray network-MITM (cert pinning + CA-key-storage make it not worth building)
+- `docs/archived/MOBILE.md` — mobile keyboards / share extensions (out of scope for v1–v2)
 
 Current state: Phase 1 (sidecar + proxy + VS Code integration) complete. Phase 0 clipboard guard live at `raianul.aivion-mask-vscode` on the marketplace. Browser extension and SDKs are scaffold.
 

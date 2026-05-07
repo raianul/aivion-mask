@@ -70,11 +70,11 @@ Protects secrets before they reach Cursor, Continue, GitHub Copilot, or any AI c
 Install: ext install raianul.aivion-mask-vscode
 ```
 
-**Phase 1 (planned)** — Proxy mode + MCP server. Local OpenAI-compatible server at `http://localhost:8003/v1/openai`. Session tokens (`__P1__`, `__P2__`) replace PII end-to-end with full restore in the response.
+**Phase 1 (shipped)** — Proxy mode. Local OpenAI-compatible server at `http://localhost:47474/v1/chat/completions`. Session tokens (`__P1__`, `__P2__`) replace PII end-to-end with full restore in the response.
 
 **Phase 2 (planned)** — Deep integration. Live scan of open files, inline decorations, pre-commit hook.
 
-[Full plan →](doc/platform/VS_CODE.md)
+[Full plan →](docs/dev-tool/VS_CODE.md)
 
 ---
 
@@ -82,7 +82,7 @@ Install: ext install raianul.aivion-mask-vscode
 
 Masks PII in ChatGPT, Claude, Gemini, Grok, and other AI chat interfaces. Full round-trip: masks on submit, restores originals in the response. Local ONNX NER, IndexedDB session store.
 
-[Full plan →](doc/platform/BROWSER-EXTENSION.md)
+[Full plan →](docs/dev-tool/BROWSER-EXTENSION.md)
 
 ---
 
@@ -156,15 +156,14 @@ Local mode is the default for the VS Code and browser extensions. Server mode is
 
 ## Roadmap
 
-- [x] Core masking logic + token format
+- [x] Core masking engine + session model + 32 credential patterns
 - [x] VS Code extension — clipboard guard (Phase 0) — [install](https://marketplace.visualstudio.com/items?itemName=raianul.aivion-mask-vscode)
-- [ ] VS Code extension — proxy mode + MCP server (Phase 1)
-- [ ] Browser extension — Chrome/Firefox (Phase 1)
+- [x] Local proxy sidecar (`localhost:47474`) — OpenAI-compatible, async DB, streaming (Phase 1)
+- [ ] Anthropic `/v1/messages` support + Claude Code integration (v1.5)
+- [ ] VS Code extension — deep integration + live scan (Phase 2)
+- [ ] Browser extension — Chrome/Firefox
 - [ ] Python SDK
 - [ ] TypeScript SDK
-- [ ] VS Code extension — deep integration + live scan (Phase 2)
-- [ ] Mobile — iOS keyboard extension (Phase 1)
-- [ ] Mobile — Android IME (Phase 1)
 
 ---
 
