@@ -27,3 +27,4 @@ Thumbs.db
 .claude/
 memory/
 docs/
+packages/openai/
