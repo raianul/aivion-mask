@@ -63,7 +63,9 @@ Same `session_id` across turns prevents the "turn 3 leak" — a secret mentioned
 **1. Install and start:**
 
 ```bash
-pip install aivion-mask-claude
+git clone https://github.com/raianul/aivion-mask.git
+cd aivion-mask/packages/claude
+pip install -e .
 aivion-mask-claude          # proxy listens on :47474
 ```
 
