@@ -93,14 +93,6 @@ Both OAuth (subscription) and API key auth pass through unchanged. The proxy nev
 
 ---
 
-## Browser Extension
-
-Masks PII in ChatGPT, Claude, Gemini, Grok, and other AI chat interfaces. Full round-trip: masks on submit, restores originals in the response.
-
-[Full plan →](docs/dev-tool/BROWSER-EXTENSION.md)
-
----
-
 ## Supported Credential Types
 
 **Secrets & keys:** AWS_ACCESS_KEY, GITHUB_TOKEN, OPENAI_KEY, GOOGLE_API_KEY, AZURE_KEY, NPM_TOKEN, GENERIC_API_KEY
