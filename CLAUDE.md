@@ -6,7 +6,6 @@ Local-first PII masking layer for LLM applications. Masks sensitive data before 
 
 | Path | What it is | Status |
 |---|---|---|
-| `core/recognizers/` | Shared regex + NER recognizer patterns | shared credential pattern library |
 | `sidecar/` | Local FastAPI proxy — masks PII before LLM, restores in response | active |
 | `extension/browser/` | Chrome/Firefox extension for AI chat UIs | scaffold |
 | `sdk/python/` | `pip install aivion-mask` | scaffold |
@@ -18,7 +17,6 @@ Local-first PII masking layer for LLM applications. Masks sensitive data before 
 ## Code Style
 
 - **Python:** `ruff` — config in `pyproject.toml`
-- **`core/`:** zero external runtime dependencies — must work offline
 
 ## Sidecar Commands
 
@@ -36,14 +34,6 @@ aivion-mask-sidecar              # start sidecar on :47474
 - **Token format:** `__P1__`, `__P2__` — short (5–7 chars), streaming-safe, double-underscore delimiters unambiguous in any text.
 - **Session model:** same `session_id` across turns prevents "turn 3 leak". Pre-redact known entities before running NER on subsequent turns.
 - **Display values ≠ tokens:** `__P1__` goes to the LLM; `[Name]` is shown to end users during streaming. Two separate concepts.
-
-## Recognizers (`core/recognizers/`)
-
-When adding a new pattern:
-- Include at least one positive and one negative test case
-- Use entropy filtering to reduce false positives
-- Document the pattern source
-- Add entry to `core/recognizers/README.md`
 
 ## Build Phases
 
