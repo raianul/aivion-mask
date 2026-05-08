@@ -8,22 +8,20 @@ Thanks for your interest in contributing.
 
 This repo contains the open source components of aivion-mask:
 
-- `extension/vscode/` — VS Code extension
-- `extension/browser/` — Chrome/Firefox browser extension
-- `sdk/python/` — Python SDK
-- `sdk/typescript/` — TypeScript SDK
-- `core/` — Shared masking logic and recognizer patterns
-
-The server-side infrastructure (session store, audit trail, policy management) is not in this repo.
+| Path | What it is |
+|---|---|
+| `packages/core/` | Shared masking engine — patterns, session, tokens, streaming |
+| `packages/claude/` | Anthropic Claude provider (`aivion-mask-claude`) |
+| `packages/openai/` | OpenAI provider (`aivion-mask-openai`) |
+| `extension/browser/` | Chrome/Firefox browser extension (scaffold) |
 
 ---
 
 ## Good first contributions
 
-- **New recognizer patterns** — add regex patterns for credential types not yet covered in `core/recognizers/`
+- **New credential patterns** — add regex patterns for types not yet covered in `packages/core/aivion_mask_core/masker.py`
 - **Browser extension content scripts** — adapters for AI platforms not yet supported
-- **SDK improvements** — error handling, type safety, docs
-- **False positive reports** — open an issue with the pattern that's triggering incorrectly
+- **False positive reports** — open an issue with the pattern triggering incorrectly
 
 ---
 
@@ -31,38 +29,57 @@ The server-side infrastructure (session store, audit trail, policy management) i
 
 1. Fork the repo
 2. Create a branch: `git checkout -b feat/your-feature`
-3. Make your changes
+3. Make your changes with tests
 4. Open a pull request with a clear description of what and why
 
 ---
 
-## Recognizer patterns
+## Development setup
 
-When adding a new credential recognizer to `core/recognizers/`:
+```bash
+# Core
+cd packages/core && pip install -e ".[dev]" && pytest
 
-- Include at least one positive test case and one negative test case
+# Claude provider
+cd packages/claude && pip install -e ".[dev]" && pytest
+
+# OpenAI provider
+cd packages/openai && pip install -e ".[dev]" && pytest
+```
+
+Or with uv workspace from the repo root:
+
+```bash
+uv sync && uv run pytest packages/core packages/claude packages/openai
+```
+
+---
+
+## Adding a credential pattern
+
+When adding a new pattern to `packages/core/aivion_mask_core/masker.py`:
+
+- Include at least one positive and one negative test case in `packages/core/tests/test_masker.py`
 - Use entropy filtering where appropriate to reduce false positives
 - Document the pattern source (e.g. "GitHub token format per GitHub docs")
-- Add it to the entity list in `core/recognizers/README.md`
 
 ---
 
 ## Code style
 
-- TypeScript: ESLint + Prettier (config in each package)
-- Python: ruff (config in `pyproject.toml`)
-- No external runtime dependencies in `core/` — it must work offline
+- Python: `ruff` (config in each `pyproject.toml`)
+- No external runtime dependencies in `packages/core/` — must work offline
 
 ---
 
 ## Reporting issues
 
 Open a GitHub issue with:
-- Which component (VS Code extension / browser extension / SDK / core)
+- Which component (`core` / `claude` / `openai` / browser extension)
 - What you expected vs what happened
 - A minimal reproduction if possible
 
-For false positives / false negatives in detection: include the pattern (redact any real secrets) and the entity type.
+For false positives / false negatives: include the pattern (redact any real secrets) and the entity type.
 
 ---
 
