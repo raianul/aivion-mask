@@ -60,24 +60,6 @@ Same `session_id` across turns prevents the "turn 3 leak" — an entity mentione
 
 ---
 
-## VS Code Extension
-
-Protects secrets before they reach Cursor, Continue, GitHub Copilot, or any AI coding assistant.
-
-**Phase 0 (shipped)** — Clipboard guard. Intercepts clipboard on copy, replaces detected secrets with `[REDACTED:TYPE]` before you paste. 40 credential patterns. No server, no config.
-
-```
-Install: ext install raianul.aivion-mask-vscode
-```
-
-**Phase 1 (shipped)** — Proxy mode. Local OpenAI-compatible server at `http://localhost:47474/v1/chat/completions`. Session tokens (`__P1__`, `__P2__`) replace PII end-to-end with full restore in the response.
-
-**Phase 2 (planned)** — Deep integration. Live scan of open files, inline decorations, pre-commit hook.
-
-[Full plan →](docs/dev-tool/VS_CODE.md)
-
----
-
 ## Claude Code & Anthropic Tools
 
 The sidecar speaks Anthropic's native `/v1/messages` wire format. Point any Claude-using tool at `http://localhost:47474` and every prompt is masked before it reaches `api.anthropic.com`. Responses are unmasked before they reach you.
@@ -193,11 +175,10 @@ Local mode is the default for the VS Code and browser extensions. Server mode is
 
 ## Roadmap
 
-- [x] Core masking engine + session model + 32 credential patterns
-- [x] VS Code extension — clipboard guard (Phase 0) — [install](https://marketplace.visualstudio.com/items?itemName=raianul.aivion-mask-vscode)
-- [x] Local proxy sidecar (`localhost:47474`) — OpenAI-compatible, async DB, streaming (Phase 1)
-- [x] Anthropic `/v1/messages` support + Claude Code integration (v1.5)
-- [ ] VS Code extension — deep integration + live scan (Phase 2)
+- [x] Core masking engine + session model + 40 credential patterns
+- [x] Local proxy sidecar (`localhost:47474`) — OpenAI-compatible, async DB, streaming
+- [x] Anthropic `/v1/messages` support + Claude Code integration (v0.2.0)
+- [ ] `aivion-mask-sidecar install` — one-command shell rc setup + system service
 - [ ] Browser extension — Chrome/Firefox
 - [ ] Python SDK
 - [ ] TypeScript SDK

@@ -333,7 +333,7 @@ const restored = await client.unmask({ text: llmResponse, sessionId })
 ```
 aivion-mask/
   core/
-    recognizers/     Shared TypeScript credential patterns (VS Code + browser extension)
+    recognizers/     Shared credential patterns (browser extension + SDK)
   sidecar/           Machine-level local service (Python)
     aivion_mask_sidecar/
       main.py        FastAPI app — port 47474
@@ -346,7 +346,6 @@ aivion-mask/
       config.py      ~/.aivion-mask/config.toml loader
     pyproject.toml
   extension/
-    vscode/          VS Code extension (Phase 0 shipped, Phase 1 in progress)
     browser/         Chrome/Firefox extension (scaffold)
   sdk/
     python/          pip install aivion-mask

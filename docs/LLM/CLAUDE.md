@@ -8,7 +8,7 @@ First provider in the per-provider rollout. Goal: cover every place a developer 
 
 ## Goal
 
-A user installs aivion-mask, points any Claude-using tool at the local sidecar (or runs through the wrapper / VS Code extension), and every prompt is masked before it reaches `api.anthropic.com`. Every response has placeholders restored before the user sees them. The user's existing auth — OAuth (subscription) or API key — flows through unchanged.
+A user installs aivion-mask, points any Claude-using tool at the local sidecar, and every prompt is masked before it reaches `api.anthropic.com`. Every response has placeholders restored before the user sees them. The user's existing auth — OAuth (subscription) or API key — flows through unchanged.
 
 No CA install. No system tray. No `sudo`. Plain HTTP on `localhost:47474`.
 
@@ -24,7 +24,7 @@ No CA install. No system tray. No `sudo`. Plain HTTP on `localhost:47474`.
 | **Claude Code CLI (API key)** | ✅ | Same, with `x-api-key` header instead of OAuth |
 | **Anthropic Python SDK** | ✅ | `Anthropic(base_url="http://localhost:47474")` or env var |
 | **Anthropic TypeScript SDK** | ✅ | `new Anthropic({ baseURL: 'http://localhost:47474' })` or env var |
-| **Continue.dev with Anthropic provider** | ✅ | VS Code extension rewrites `apiBase` in `~/.continue/config.json` |
+| **Continue.dev with Anthropic provider** | ✅ | Set `apiBase: "http://localhost:47474"` in `~/.continue/config.json` |
 | **aider with `--model claude-*`** | ✅ | aider uses litellm under the hood; `ANTHROPIC_API_BASE` env var is honored |
 | **llm + `llm-anthropic` plugin** | ✅ | Plugin honors `ANTHROPIC_API_BASE` |
 | **Claude.ai web UI** | ✅ in v1.6 | Browser extension — separate work, not in this plan |
@@ -355,16 +355,16 @@ async def parse_anthropic_sse(byte_stream):
 
 ---
 
-## Per-tool setup (after v1.5 ships)
+## Per-tool setup
 
 | Tool | Setup |
 |---|---|
-| **Claude Code (CLI)** | `export ANTHROPIC_BASE_URL=http://localhost:47474` in shell rc, **OR** run `aivion-mask run claude ...` |
-| **Claude Code in VS Code** | Aivion VS Code extension writes `terminal.integrated.env.osx.ANTHROPIC_BASE_URL` automatically |
+| **Claude Code (CLI)** | `export ANTHROPIC_BASE_URL=http://localhost:47474` in shell rc |
+| **Claude Code in VS Code** | Same env var — restart VS Code after adding to shell rc |
 | **Anthropic Python SDK** | `Anthropic(base_url="http://localhost:47474")` or env var |
 | **Anthropic TypeScript SDK** | `new Anthropic({ baseURL: 'http://localhost:47474' })` or env var |
-| **Continue.dev** | Aivion VS Code extension offers "Route Continue through aivion-mask" command — rewrites `apiBase` in `~/.continue/config.json` |
-| **aider** (claude models) | `export ANTHROPIC_API_BASE=http://localhost:47474` (litellm convention, aider passes through) |
+| **Continue.dev** | Set `apiBase: "http://localhost:47474"` in `~/.continue/config.json` |
+| **aider** (claude models) | `export ANTHROPIC_API_BASE=http://localhost:47474` (litellm convention) |
 | **llm + llm-anthropic** | `export ANTHROPIC_API_BASE=http://localhost:47474` |
 | **OpenCode** | Set `ANTHROPIC_BASE_URL` in OpenCode config or env |
 

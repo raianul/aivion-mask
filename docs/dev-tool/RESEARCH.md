@@ -24,7 +24,7 @@ Four places you can intercept LLM traffic. Each has a different coverage radius.
 
 **Coverage:** Anything the user copy-pastes manually. Doesn't cover programmatic calls (Cursor's background indexing, Claude Code's file reads).
 
-**Why it was Phase 0:** Zero installation friction. Ships as a VS Code extension. Gives immediate value to users who paste secrets into chat. Acts as a safety net while the proxy-based approach is built.
+**Why it was Phase 0:** Zero installation friction. Gives immediate value to users who paste secrets into chat. Acts as a safety net while the proxy-based approach is built. Not currently pursued — proxy approach covers more surface area.
 
 **Limitation:** The masking happens at paste time, not at send time. If the user typed the secret directly, it's not caught. If the app sends it programmatically, it's not caught.
 
