@@ -23,15 +23,19 @@ session_ttl_hours = 8
 idle_shutdown_minutes = 0
 unmask_response = true
 
-# Add custom regex patterns below. Example:
+# Custom regex patterns (optional):
 # [[sidecar.custom_patterns]]
-# name = "MY_INTERNAL_TOKEN"
+# name    = "MY_INTERNAL_TOKEN"
 # pattern = 'int_[A-Za-z0-9]{32}'
-# abbrev is unused — masked values use partial-reveal display (e.g. int_AB***yz)
 
-[llm]
-api_base = "https://api.openai.com/v1"
-api_key = ""
+# ── Claude ───────────────────────────────────────────────────────────────────
+# No config needed. API key or OAuth token is forwarded directly from your
+# tool's request headers (ANTHROPIC_BASE_URL + existing auth = done).
+
+# ── OpenAI ───────────────────────────────────────────────────────────────────
+# [openai]
+# api_base = "https://api.openai.com/v1"
+# api_key  = ""
 """
 
 @dataclass
@@ -49,14 +53,14 @@ class SidecarSettings:
     custom_patterns: list[CustomPattern] = field(default_factory=list)
 
 @dataclass
-class LLMSettings:
+class OpenAISettings:
     api_base: str = "https://api.openai.com/v1"
     api_key: str = ""
 
 @dataclass
 class Config:
     sidecar: SidecarSettings = field(default_factory=SidecarSettings)
-    llm: LLMSettings = field(default_factory=LLMSettings)
+    openai: OpenAISettings = field(default_factory=OpenAISettings)
 
 def load_config() -> Config:
     if not CONFIG_PATH.exists():
@@ -70,5 +74,5 @@ def load_config() -> Config:
     raw_patterns = sidecar_data.pop("custom_patterns", [])
     sidecar = SidecarSettings(**sidecar_data)
     sidecar.custom_patterns = [CustomPattern(**p) for p in raw_patterns]
-    llm = LLMSettings(**data.get("llm", {}))
-    return Config(sidecar=sidecar, llm=llm)
+    openai = OpenAISettings(**data.get("openai", {}))
+    return Config(sidecar=sidecar, openai=openai)
