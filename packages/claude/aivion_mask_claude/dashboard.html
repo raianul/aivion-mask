@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>aivion-mask</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0f1117;
+    --surface:  #1a1d27;
+    --border:   #2a2d3a;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --accent:   #6366f1;
+    --danger:   #ef4444;
+    --success:  #22c55e;
+    --warn:     #f59e0b;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo { font-size: 15px; font-weight: 600; color: var(--text); letter-spacing: 0.02em; }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 10px; }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--success) 15%, transparent);
+    color: var(--success);
+    border: 1px solid color-mix(in srgb, var(--success) 30%, transparent);
+  }
+
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .stats { color: var(--muted); }
+  .stats strong { color: var(--text); }
+
+  .btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    background: var(--surface);
+    color: var(--text);
+  }
+  .btn:hover { opacity: 0.8; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-danger {
+    background: color-mix(in srgb, var(--danger) 15%, transparent);
+    color: var(--danger);
+    border-color: color-mix(in srgb, var(--danger) 30%, transparent);
+  }
+
+  .btn-primary {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  .btn-sm { padding: 3px 10px; font-size: 11px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--surface);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--border) 40%, transparent);
+    border-bottom: 1px solid var(--border);
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+  .session-id {
+    font-family: inherit;
+    color: var(--accent);
+    font-size: 12px;
+  }
+
+  .token-count {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    background: color-mix(in srgb, var(--accent) 15%, transparent);
+    color: var(--accent);
+  }
+
+  .expired { color: var(--danger); }
+  .expiring { color: var(--warn); }
+
+  .empty {
+    text-align: center;
+    padding: 48px;
+    color: var(--muted);
+  }
+
+  .pagination {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .page-info { color: var(--muted); font-size: 12px; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  .toast.ok  { background: color-mix(in srgb, var(--success) 20%, var(--surface)); color: var(--success); border: 1px solid color-mix(in srgb, var(--success) 30%, transparent); }
+  .toast.err { background: color-mix(in srgb, var(--danger)  20%, var(--surface)); color: var(--danger);  border: 1px solid color-mix(in srgb, var(--danger)  30%, transparent); }
+
+  .spinner { display: inline-block; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <span class="logo">aivion<span>-mask</span></span>
+  <div class="header-right">
+    <span class="badge" id="status-badge">● live</span>
+    <button class="btn btn-primary" onclick="load()">↺ Refresh</button>
+    <button class="btn btn-danger" id="clean-btn" onclick="cleanup()">Clean expired</button>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <div class="stats">
+      <span id="stats-text">Loading…</span>
+    </div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Request ID</th>
+        <th>Tokens masked</th>
+        <th>First seen</th>
+        <th>Expires</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+
+  <div class="pagination" id="pagination"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const PER_PAGE = 20;
+  let currentPage = 1;
+  let total = 0;
+
+  // Capture auth token from URL once, then strip it from history.
+  const _params = new URLSearchParams(location.search);
+  const AUTH_TOKEN = _params.get('token') || '';
+  if (AUTH_TOKEN) {
+    history.replaceState({}, '', location.pathname);
+  }
+
+  function authFetch(url, opts = {}) {
+    const headers = Object.assign({}, opts.headers || {}, { 'X-Aivion-Auth': AUTH_TOKEN });
+    return fetch(url, Object.assign({}, opts, { headers }));
+  }
+
+  function fmt(unix) {
+    if (!unix) return '—';
+    return new Date(unix * 1000).toLocaleString();
+  }
+
+  function expiryClass(unix) {
+    const now = Date.now() / 1000;
+    if (unix < now) return 'expired';
+    if (unix - now < 3600) return 'expiring';
+    return '';
+  }
+
+  function expiryLabel(unix) {
+    const now = Date.now() / 1000;
+    if (unix < now) return '⚠ expired';
+    const h = Math.floor((unix - now) / 3600);
+    const m = Math.floor(((unix - now) % 3600) / 60);
+    if (h > 0) return `in ${h}h ${m}m`;
+    return `in ${m}m`;
+  }
+
+  async function load(page) {
+    if (page !== undefined) currentPage = page;
+    try {
+      const res = await authFetch(`/v1/sessions?page=${currentPage}&per_page=${PER_PAGE}`);
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      total = data.total;
+      renderTable(data.sessions);
+      renderPagination(data.total, data.per_page);
+      const stats = document.getElementById('stats-text');
+      stats.textContent = '';
+      const strong = document.createElement('strong');
+      strong.textContent = String(total);
+      stats.appendChild(strong);
+      stats.appendChild(document.createTextNode(` session${total !== 1 ? 's' : ''} in store`));
+    } catch (e) {
+      document.getElementById('stats-text').textContent = 'Failed to load';
+      toast('Could not reach proxy', 'err');
+    }
+  }
+
+  function el(tag, opts = {}) {
+    const node = document.createElement(tag);
+    if (opts.className) node.className = opts.className;
+    if (opts.text != null) node.textContent = opts.text;
+    return node;
+  }
+
+  function renderTable(rows) {
+    const tbody = document.getElementById('tbody');
+    tbody.textContent = '';
+    if (!rows.length) {
+      const tr = el('tr');
+      const td = el('td', { className: 'empty', text: 'No sessions stored' });
+      td.colSpan = 5;
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+      return;
+    }
+    for (const r of rows) {
+      const tr = el('tr');
+
+      const tdId = el('td');
+      tdId.appendChild(el('span', { className: 'session-id', text: r.session_id }));
+      tr.appendChild(tdId);
+
+      const tdCount = el('td');
+      tdCount.appendChild(el('span', { className: 'token-count', text: String(r.token_count) }));
+      tr.appendChild(tdCount);
+
+      tr.appendChild(el('td', { text: fmt(r.first_seen) }));
+      tr.appendChild(el('td', { className: expiryClass(r.expires_at), text: expiryLabel(r.expires_at) }));
+
+      const tdAction = el('td');
+      const btn = el('button', { className: 'btn btn-danger btn-sm', text: 'Delete' });
+      btn.addEventListener('click', () => deleteSession(r.session_id, btn));
+      tdAction.appendChild(btn);
+      tr.appendChild(tdAction);
+
+      tbody.appendChild(tr);
+    }
+  }
+
+  function renderPagination(total, perPage) {
+    const pages = Math.ceil(total / perPage);
+    const wrap = document.getElementById('pagination');
+    wrap.textContent = '';
+    if (pages <= 1) return;
+
+    const prev = el('button', { className: 'btn btn-sm', text: '← Prev' });
+    prev.disabled = currentPage <= 1;
+    prev.addEventListener('click', () => load(currentPage - 1));
+    wrap.appendChild(prev);
+
+    wrap.appendChild(el('span', { className: 'page-info', text: `Page ${currentPage} of ${pages}` }));
+
+    const next = el('button', { className: 'btn btn-sm', text: 'Next →' });
+    next.disabled = currentPage >= pages;
+    next.addEventListener('click', () => load(currentPage + 1));
+    wrap.appendChild(next);
+  }
+
+  async function deleteSession(id, btn) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    try {
+      const res = await authFetch(`/v1/session/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(res.statusText);
+      toast('Session deleted', 'ok');
+      load();
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = 'Delete';
+      toast('Delete failed', 'err');
+    }
+  }
+
+  async function cleanup() {
+    const btn = document.getElementById('clean-btn');
+    btn.disabled = true;
+    btn.textContent = '⟳ Cleaning…';
+    try {
+      const res = await authFetch('/v1/sessions/cleanup', { method: 'POST' });
+      if (!res.ok) throw new Error(res.statusText);
+      const data = await res.json();
+      toast(`Removed ${data.deleted} expired row${data.deleted !== 1 ? 's' : ''}`, 'ok');
+      load();
+    } catch (e) {
+      toast('Cleanup failed', 'err');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Clean expired';
+    }
+  }
+
+  let _toastTimer;
+  function toast(msg, type) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className = `toast ${type} show`;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+  }
+
+  load();
+</script>
+</body>
+</html>

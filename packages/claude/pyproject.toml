@@ -24,6 +24,7 @@ dev = [
 ]
 
 [project.scripts]
+aivion-mask = "aivion_mask_claude.cli:main"
 aivion-mask-claude = "aivion_mask_claude.main:run"
 
 [tool.pytest.ini_options]
