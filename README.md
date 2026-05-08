@@ -77,9 +77,11 @@ cd aivion-mask
 `uninstall.sh` will:
 
 1. Stop the proxy if it's running
-2. Remove the `aivion-mask` block from your shell rc file
+2. Remove the `aivion-mask` block from your shell rc file — both the `PATH` line and the `ANTHROPIC_BASE_URL` export, so Claude Code (and any other tool reading that env var) stops routing through the proxy
 3. Delete the venv at `~/.aivion-mask/venv/`
 4. Ask before deleting `~/.aivion-mask/` (which holds your config, auth token, and session DB) — answer `n` to keep your data for a future reinstall
+
+Open a new terminal afterward so the rc changes take effect.
 
 **Per-tool reference:**
 
@@ -102,7 +104,7 @@ When you want to talk to Claude directly (debugging, no secrets in the prompt, p
 
 ```bash
 # Just this one command:
-ANTHROPIC_BASE_URL= claude
+env -u ANTHROPIC_BASE_URL claude
 
 # This terminal session only:
 unset ANTHROPIC_BASE_URL
