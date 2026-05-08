@@ -1,9 +1,0 @@
-{
-  "name": "@aivion/recognizers",
-  "version": "0.1.0",
-  "description": "Shared credential recognizer patterns for aivion-mask clients",
-  "private": true,
-  "main": "index.ts",
-  "types": "index.ts",
-  "license": "Apache-2.0"
-}
