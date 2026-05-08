@@ -82,25 +82,34 @@ Install: ext install raianul.aivion-mask-vscode
 
 The sidecar speaks Anthropic's native `/v1/messages` wire format. Point any Claude-using tool at `http://localhost:47474` and every prompt is masked before it reaches `api.anthropic.com`. Responses are unmasked before they reach you.
 
-**Start the sidecar:**
+**1. Start the sidecar:**
 
 ```bash
-cd sidecar && pip install -e ".[dev]"
+pip install aivion-mask-sidecar
 aivion-mask-sidecar          # listens on :47474
 ```
 
-**Per-tool setup:**
+**2. Add one line to your shell rc, then restart your terminal (and VS Code):**
+
+```bash
+# ~/.zshrc or ~/.bashrc
+export ANTHROPIC_BASE_URL=http://localhost:47474
+```
+
+That's it. Every tool that respects `ANTHROPIC_BASE_URL` now routes through the proxy automatically.
+
+**Per-tool reference:**
 
 | Tool | How |
 |---|---|
-| **Claude Code CLI** | `export ANTHROPIC_BASE_URL=http://localhost:47474` in shell rc |
-| **Claude Code in VS Code** | Aivion VS Code extension sets `terminal.integrated.env.osx.ANTHROPIC_BASE_URL` automatically |
-| **Anthropic Python SDK** | `Anthropic(base_url="http://localhost:47474")` or set `ANTHROPIC_BASE_URL` |
-| **Anthropic TypeScript SDK** | `new Anthropic({ baseURL: 'http://localhost:47474' })` or set `ANTHROPIC_BASE_URL` |
-| **Continue.dev** | Aivion VS Code extension rewrites `apiBase` in `~/.continue/config.json` |
-| **aider** | `export ANTHROPIC_API_BASE=http://localhost:47474` (litellm convention) |
-| **llm + llm-anthropic** | `export ANTHROPIC_API_BASE=http://localhost:47474` |
-| **OpenCode** | Set `ANTHROPIC_BASE_URL` in OpenCode config or env |
+| **Claude Code CLI** | Picks up `ANTHROPIC_BASE_URL` automatically |
+| **Claude Code in VS Code** | Restart VS Code after setting the env var — extension host and terminals both inherit it |
+| **Anthropic Python SDK** | Picks up `ANTHROPIC_BASE_URL`, or pass `base_url="http://localhost:47474"` explicitly |
+| **Anthropic TypeScript SDK** | Picks up `ANTHROPIC_BASE_URL`, or pass `baseURL: 'http://localhost:47474'` explicitly |
+| **aider** | Use `ANTHROPIC_API_BASE=http://localhost:47474` (litellm convention) |
+| **llm + llm-anthropic** | Use `ANTHROPIC_API_BASE=http://localhost:47474` |
+| **OpenCode** | Picks up `ANTHROPIC_BASE_URL` automatically |
+| **Continue.dev** | Set `apiBase: "http://localhost:47474"` in `~/.continue/config.json` |
 
 Both OAuth (subscription) and API key auth pass through unchanged. The proxy never stores credentials.
 
