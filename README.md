@@ -76,7 +76,7 @@ aivion-mask-claude          # proxy listens on :47474
 export ANTHROPIC_BASE_URL=http://localhost:47474
 ```
 
-Restart your terminal. Every tool that respects `ANTHROPIC_BASE_URL` now routes through the proxy.
+Restart your terminal and VS Code (quit and reopen — not just reload). Every tool that respects `ANTHROPIC_BASE_URL` now routes through the proxy.
 
 **Per-tool reference:**
 
