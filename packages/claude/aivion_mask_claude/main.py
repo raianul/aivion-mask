@@ -9,11 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from .anthropic import forward_complete_anthropic, forward_streaming_anthropic, walk_request
-from .config import load_config, Config
-from .masker import mask_message, register_custom_patterns
 from .mcp import get_manifest
-from .proxy import forward_complete, forward_streaming
-from .session import cleanup_expired, delete_session, init_db
+from aivion_mask_core.config import load_config, Config
+from aivion_mask_core.masker import register_custom_patterns
+from aivion_mask_core.session import cleanup_expired, delete_session, init_db
 
 _config: Config
 _conn = None
@@ -22,7 +21,7 @@ _conn = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global _config, _conn
-    _pkg_log = logging.getLogger("aivion_mask_sidecar")
+    _pkg_log = logging.getLogger("aivion_mask_claude")
     _pkg_log.setLevel(logging.INFO)
     if not _pkg_log.handlers:
         _h = logging.StreamHandler()
@@ -55,7 +54,7 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "0.1.0"}
+    return {"status": "ok", "version": "0.2.0"}
 
 
 @app.get("/mcp")
@@ -67,51 +66,6 @@ def mcp():
 async def clear_session(session_id: str):
     await delete_session(_conn, session_id)
     return {"deleted": session_id}
-
-
-@app.post("/v1/chat/completions")
-async def chat_completions(request: Request):
-    body = await request.json()
-    session_id = (
-        request.headers.get("X-Aivion-Session")
-        or body.get("user")
-        or str(uuid.uuid4())
-    )
-
-    if not _config.llm.api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="No LLM API key configured. Edit ~/.aivion-mask/config.toml",
-        )
-
-    messages = body.get("messages", [])
-    masked_messages = []
-    for msg in messages:
-        content = msg.get("content", "")
-        if isinstance(content, str) and content:
-            content = await mask_message(content, _conn, session_id, _config.sidecar.session_ttl_hours)
-        masked_messages.append({**msg, "content": content})
-
-    masked_body = {**body, "messages": masked_messages}
-    masked_body.pop("user", None)
-
-    try:
-        unmask = _config.sidecar.unmask_response
-        if body.get("stream", False):
-            return StreamingResponse(
-                forward_streaming(
-                    masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn,
-                    unmask_response=unmask,
-                ),
-                media_type="text/event-stream",
-            )
-        result = await forward_complete(
-            masked_body, _config.llm.api_base, _config.llm.api_key, session_id, _conn,
-            unmask_response=unmask,
-        )
-        return JSONResponse(result)
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Upstream LLM unreachable: {exc}") from exc
 
 
 @app.post("/v1/messages")
@@ -130,8 +84,7 @@ async def messages(request: Request):
         upstream_headers[name] = value
     upstream_headers["Content-Type"] = "application/json"
 
-    # Preserve upstream query string (e.g. ?beta=true from Claude Code)
-    query_string = request.url.query  # e.g. "beta=true" or ""
+    query_string = request.url.query
 
     has_auth = any(k.lower() in ("authorization", "x-api-key") for k in upstream_headers)
     if not has_auth:
@@ -143,7 +96,7 @@ async def messages(request: Request):
     ttl = _config.sidecar.session_ttl_hours
     unmask = _config.sidecar.unmask_response
 
-    _log = logging.getLogger("aivion_mask_sidecar.main")
+    _log = logging.getLogger("aivion_mask_claude.main")
     _log.info("[REQUEST] session=%s model=%s stream=%s unmask=%s",
               session_id[:8], body.get("model", "?"), body.get("stream", False), unmask)
 
@@ -167,12 +120,11 @@ async def messages(request: Request):
 
 
 def run() -> None:
-    import logging
     import uvicorn
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     cfg = load_config()
     uvicorn.run(
-        "aivion_mask_sidecar.main:app",
+        "aivion_mask_claude.main:app",
         host="127.0.0.1",
         port=cfg.sidecar.port,
         workers=2,

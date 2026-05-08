@@ -1,4 +1,4 @@
-from aivion_mask_sidecar.stream import split_at_safe_point, LookaheadBuffer
+from aivion_mask_core.stream import split_at_safe_point, LookaheadBuffer
 
 # --- split_at_safe_point ---
 

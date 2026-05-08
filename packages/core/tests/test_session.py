@@ -1,6 +1,6 @@
 import time
 import pytest
-from aivion_mask_sidecar.session import (
+from aivion_mask_core.session import (
     init_db, get_token, next_index, save_token,
     get_all_mappings, delete_session, cleanup_expired,
 )

@@ -4,9 +4,9 @@ from typing import AsyncIterator
 
 import httpx
 
-from .session import get_all_mappings
-from .stream import LookaheadBuffer
-from .tokens import replace_tokens
+from aivion_mask_core.session import get_all_mappings
+from aivion_mask_core.stream import LookaheadBuffer
+from aivion_mask_core.tokens import replace_tokens
 
 
 async def forward_complete(

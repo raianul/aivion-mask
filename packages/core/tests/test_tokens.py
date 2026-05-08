@@ -1,4 +1,4 @@
-from aivion_mask_sidecar.tokens import entity_abbrev, make_token, replace_tokens
+from aivion_mask_core.tokens import entity_abbrev, make_token, replace_tokens
 
 
 def test_entity_abbrev_known():

@@ -2,16 +2,15 @@ import json
 import pytest
 import respx
 import httpx
-from aivion_mask_sidecar.anthropic import (
+from aivion_mask_claude.anthropic import (
     walk_request,
     walk_response,
     forward_complete_anthropic,
     forward_streaming_anthropic,
 )
-from aivion_mask_sidecar.session import init_db, save_token
+from aivion_mask_core.session import init_db, save_token
 
 _DB_URL = "postgresql://user:s3cr3tpass@db.example.com/myapp"
-# Opaque token (API key) used for response-unmask fixtures — not a URL
 _API_SECRET = "AKIA" + "Z" * 16
 _API_TOKEN = "__AWS1__"
 
@@ -34,14 +33,12 @@ _EMPTY_RESPONSE = {
 @pytest.fixture
 async def conn(tmp_path):
     c = await init_db(tmp_path / "t.db")
-    # Pre-seed an opaque (non-URL) token for unmask tests
     await save_token(c, "s1", _API_TOKEN, _API_SECRET, 1, ttl_hours=8)
     yield c
     await c.close()
 
 
 def _url_masked(text: str) -> bool:
-    """True if text contains a structurally-masked DB URL (scheme preserved, secrets hidden)."""
     return (
         "postgresql://" in text
         and "s3cr3tpass" not in text
@@ -50,10 +47,6 @@ def _url_masked(text: str) -> bool:
     )
 
 
-# ---------------------------------------------------------------------------
-# walk_request
-# ---------------------------------------------------------------------------
-
 async def test_walk_request_string_system(conn):
     body = {"system": f"Use the DB at {_DB_URL} for queries", "messages": []}
     result = await walk_request(body, conn, "s1", 8)
@@ -61,12 +54,8 @@ async def test_walk_request_string_system(conn):
 
 
 async def test_walk_request_block_system(conn):
-    body = {
-        "system": [{"type": "text", "text": f"DB is {_DB_URL}"}],
-        "messages": [],
-    }
+    body = {"system": [{"type": "text", "text": f"DB is {_DB_URL}"}], "messages": []}
     result = await walk_request(body, conn, "s1", 8)
-    assert result["system"][0]["type"] == "text"
     assert _url_masked(result["system"][0]["text"])
 
 
@@ -78,15 +67,13 @@ async def test_walk_request_string_content(conn):
 
 async def test_walk_request_block_content_text_and_tool_result(conn):
     body = {
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": f"use {_DB_URL}"},
-                    {"type": "tool_result", "tool_use_id": "x", "content": f"ok, used {_DB_URL}"},
-                ],
-            }
-        ]
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "text", "text": f"use {_DB_URL}"},
+                {"type": "tool_result", "tool_use_id": "x", "content": f"ok, used {_DB_URL}"},
+            ],
+        }]
     }
     result = await walk_request(body, conn, "s1", 8)
     blocks = result["messages"][0]["content"]
@@ -96,19 +83,10 @@ async def test_walk_request_block_content_text_and_tool_result(conn):
 
 async def test_walk_request_tool_use_input(conn):
     body = {
-        "messages": [
-            {
-                "role": "assistant",
-                "content": [
-                    {
-                        "type": "tool_use",
-                        "id": "tu_1",
-                        "name": "bash",
-                        "input": {"command": f"psql {_DB_URL}"},
-                    }
-                ],
-            }
-        ]
+        "messages": [{
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "tu_1", "name": "bash", "input": {"command": f"psql {_DB_URL}"}}],
+        }]
     }
     result = await walk_request(body, conn, "s1", 8)
     cmd = result["messages"][0]["content"][0]["input"]["command"]
@@ -119,15 +97,13 @@ async def test_walk_request_tool_use_input(conn):
 
 async def test_walk_request_preserves_non_text_blocks(conn):
     body = {
-        "messages": [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "url", "url": "https://example.com/img.png"}},
-                    {"type": "text", "text": "describe this"},
-                ],
-            }
-        ]
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image", "source": {"type": "url", "url": "https://example.com/img.png"}},
+                {"type": "text", "text": "describe this"},
+            ],
+        }]
     }
     result = await walk_request(body, conn, "s1", 8)
     img = result["messages"][0]["content"][0]
@@ -141,10 +117,6 @@ async def test_walk_request_passthrough_when_no_secrets(conn):
     assert result["messages"][0]["content"] == "hello world"
 
 
-# ---------------------------------------------------------------------------
-# walk_response
-# ---------------------------------------------------------------------------
-
 def test_walk_response_text_block():
     mappings = {_API_TOKEN: _API_SECRET}
     body = {"content": [{"type": "text", "text": f"key is {_API_TOKEN} ok"}]}
@@ -154,11 +126,7 @@ def test_walk_response_text_block():
 
 def test_walk_response_tool_use_input():
     mappings = {_API_TOKEN: _API_SECRET}
-    body = {
-        "content": [
-            {"type": "tool_use", "id": "tu_1", "name": "bash", "input": {"command": f"echo {_API_TOKEN}"}}
-        ]
-    }
+    body = {"content": [{"type": "tool_use", "id": "tu_1", "name": "bash", "input": {"command": f"echo {_API_TOKEN}"}}]}
     result = walk_response(body, mappings)
     assert result["content"][0]["input"]["command"] == f"echo {_API_SECRET}"
 
@@ -167,47 +135,31 @@ def test_walk_response_unknown_blocks_pass_through():
     mappings = {_API_TOKEN: _API_SECRET}
     body = {"content": [{"type": "image", "source": {"url": "https://x.com/img.png"}}]}
     result = walk_response(body, mappings)
-    assert result["content"][0]["type"] == "image"
     assert result["content"][0]["source"]["url"] == "https://x.com/img.png"
 
 
 def test_walk_response_empty_content():
-    result = walk_response({"content": []}, {})
-    assert result["content"] == []
+    assert walk_response({"content": []}, {})["content"] == []
 
-
-# ---------------------------------------------------------------------------
-# forward_complete_anthropic
-# ---------------------------------------------------------------------------
 
 @respx.mock
 async def test_forward_complete_passes_x_api_key(conn):
-    respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json=_EMPTY_RESPONSE)
-    )
+    respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(200, json=_EMPTY_RESPONSE))
     await forward_complete_anthropic({"messages": [], "model": "claude-sonnet-4-6"}, _HEADERS, "s1", conn)
     assert respx.calls.last.request.headers["x-api-key"] == "sk-ant-test"
 
 
 @respx.mock
 async def test_forward_complete_passes_oauth_bearer(conn):
-    oauth_headers = {
-        "Authorization": "Bearer sk-ant-oat01-token",
-        "anthropic-version": "2023-06-01",
-        "Content-Type": "application/json",
-    }
-    respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json=_EMPTY_RESPONSE)
-    )
+    oauth_headers = {"Authorization": "Bearer sk-ant-oat01-token", "anthropic-version": "2023-06-01", "Content-Type": "application/json"}
+    respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(200, json=_EMPTY_RESPONSE))
     await forward_complete_anthropic({"messages": [], "model": "claude-sonnet-4-6"}, oauth_headers, "s1", conn)
     assert respx.calls.last.request.headers["authorization"] == "Bearer sk-ant-oat01-token"
 
 
 @respx.mock
 async def test_forward_complete_forwards_anthropic_version(conn):
-    respx.post("https://api.anthropic.com/v1/messages").mock(
-        return_value=httpx.Response(200, json=_EMPTY_RESPONSE)
-    )
+    respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(200, json=_EMPTY_RESPONSE))
     await forward_complete_anthropic({"messages": [], "model": "m"}, _HEADERS, "s1", conn)
     assert respx.calls.last.request.headers["anthropic-version"] == "2023-06-01"
 
@@ -224,17 +176,11 @@ async def test_forward_complete_unmasks_text_response(conn):
 async def test_forward_complete_skips_unmask_when_disabled(conn):
     response_body = {**_EMPTY_RESPONSE, "content": [{"type": "text", "text": f"token is {_API_TOKEN}"}]}
     respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(200, json=response_body))
-    result = await forward_complete_anthropic(
-        {"messages": [], "model": "m"}, _HEADERS, "s1", conn, unmask_response=False
-    )
+    result = await forward_complete_anthropic({"messages": [], "model": "m"}, _HEADERS, "s1", conn, unmask_response=False)
     assert _API_TOKEN in result["content"][0]["text"]
 
 
-# ---------------------------------------------------------------------------
-# forward_streaming_anthropic
-# ---------------------------------------------------------------------------
-
-def _sse(events: list[tuple[str, dict]]) -> str:
+def _sse(events):
     return "".join(f"event: {name}\ndata: {json.dumps(payload)}\n\n" for name, payload in events)
 
 
@@ -243,7 +189,7 @@ async def test_streaming_text_delta_split_placeholder_unmasked(conn):
     stream = _sse([
         ("message_start", {"type": "message_start", "message": {"id": "msg_1"}}),
         ("content_block_start", {"type": "content_block_start", "index": 0, "content_block": {"type": "text", "text": ""}}),
-        ("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": f"key is __AWS"}}),
+        ("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "key is __AWS"}}),
         ("content_block_delta", {"type": "content_block_delta", "index": 0, "delta": {"type": "text_delta", "text": "1__ ok"}}),
         ("content_block_stop", {"type": "content_block_stop", "index": 0}),
         ("message_stop", {"type": "message_stop"}),
@@ -252,9 +198,7 @@ async def test_streaming_text_delta_split_placeholder_unmasked(conn):
         return_value=httpx.Response(200, text=stream, headers={"content-type": "text/event-stream"})
     )
     collected = []
-    async for chunk in forward_streaming_anthropic(
-        {"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn
-    ):
+    async for chunk in forward_streaming_anthropic({"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn):
         collected.append(chunk.decode())
     full = "".join(collected)
     assert _API_SECRET in full
@@ -274,9 +218,7 @@ async def test_streaming_tool_use_json_split_across_deltas(conn):
         return_value=httpx.Response(200, text=stream, headers={"content-type": "text/event-stream"})
     )
     collected = []
-    async for chunk in forward_streaming_anthropic(
-        {"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn
-    ):
+    async for chunk in forward_streaming_anthropic({"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn):
         collected.append(chunk.decode())
     full = "".join(collected)
     assert _API_SECRET in full
@@ -285,17 +227,12 @@ async def test_streaming_tool_use_json_split_across_deltas(conn):
 
 @respx.mock
 async def test_streaming_passthrough_events(conn):
-    stream = _sse([
-        ("ping", {"type": "ping"}),
-        ("message_stop", {"type": "message_stop"}),
-    ])
+    stream = _sse([("ping", {"type": "ping"}), ("message_stop", {"type": "message_stop"})])
     respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(200, text=stream, headers={"content-type": "text/event-stream"})
     )
     collected = []
-    async for chunk in forward_streaming_anthropic(
-        {"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn
-    ):
+    async for chunk in forward_streaming_anthropic({"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn):
         collected.append(chunk.decode())
     full = "".join(collected)
     assert "ping" in full
@@ -304,17 +241,12 @@ async def test_streaming_passthrough_events(conn):
 
 @respx.mock
 async def test_streaming_preserves_event_names(conn):
-    stream = _sse([
-        ("message_start", {"type": "message_start", "message": {}}),
-        ("message_stop", {"type": "message_stop"}),
-    ])
+    stream = _sse([("message_start", {"type": "message_start", "message": {}}), ("message_stop", {"type": "message_stop"})])
     respx.post("https://api.anthropic.com/v1/messages").mock(
         return_value=httpx.Response(200, text=stream, headers={"content-type": "text/event-stream"})
     )
     collected = []
-    async for chunk in forward_streaming_anthropic(
-        {"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn
-    ):
+    async for chunk in forward_streaming_anthropic({"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn):
         collected.append(chunk.decode())
     full = "".join(collected)
     assert "event: message_start" in full

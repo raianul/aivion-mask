@@ -1,6 +1,6 @@
 import pytest
-from aivion_mask_sidecar.masker import detect, mask_message, display_value, Entity
-from aivion_mask_sidecar.session import init_db
+from aivion_mask_core.masker import detect, mask_message, display_value, Entity
+from aivion_mask_core.session import init_db
 
 # --- display_value() ---
 

@@ -5,10 +5,10 @@ from typing import AsyncIterator
 
 import httpx
 
-from .masker import mask_message
-from .session import get_all_mappings
-from .stream import LookaheadBuffer
-from .tokens import replace_tokens
+from aivion_mask_core.masker import mask_message
+from aivion_mask_core.session import get_all_mappings
+from aivion_mask_core.stream import LookaheadBuffer
+from aivion_mask_core.tokens import replace_tokens
 
 _log = logging.getLogger(__name__)
 
@@ -100,7 +100,6 @@ async def _parse_anthropic_sse(response: httpx.Response):
                 continue
             yield pending_event, payload
             pending_event = None
-        # blank lines are SSE event boundaries — skip
 
 
 async def forward_complete_anthropic(
@@ -136,7 +135,6 @@ async def forward_streaming_anthropic(
     """Forward a streaming Anthropic /v1/messages request; unmask text as it arrives."""
     mappings = await get_all_mappings(conn, session_id) if unmask_response else {}
 
-    # Per-block state (keyed by content block index)
     text_bufs: dict[int, LookaheadBuffer] = {}
     json_accum: dict[int, str] = {}
     block_types: dict[int, str] = {}
@@ -174,7 +172,6 @@ async def forward_streaming_anthropic(
                         yield f"event: {ename}\ndata: {json.dumps(payload)}\n\n".encode()
 
                     elif dtype == "input_json_delta":
-                        # Accumulate — emit as one reconstructed delta on content_block_stop
                         json_accum[idx] = json_accum.get(idx, "") + delta.get("partial_json", "")
 
                     else:
@@ -211,5 +208,4 @@ async def forward_streaming_anthropic(
                     yield f"event: {ename}\ndata: {json.dumps(payload)}\n\n".encode()
 
                 else:
-                    # message_start, message_delta, message_stop, ping, error — pass through
                     yield f"event: {ename}\ndata: {json.dumps(payload)}\n\n".encode()
