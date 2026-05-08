@@ -68,7 +68,6 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("PYPI_TOKEN",          re.compile(r'\bpypi-[A-Za-z0-9_-]{32,}\b')),
     ("SHOPIFY_TOKEN",       re.compile(r'\bshpat_[a-fA-F0-9]{32}\b')),
     ("SHOPIFY_CUSTOM_TOKEN",re.compile(r'\bshpca_[a-fA-F0-9]{32}\b')),
-    ("MAILCHIMP_API_KEY",   re.compile(r'\b[a-f0-9]{32}-us\d{1,2}\b')),
     ("MAILGUN_API_KEY",     re.compile(r'\bkey-[a-z0-9]{32}\b')),
     ("DATABASE_URL",        re.compile(r'(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?)://[^:@\s]+:[^@\s]+@[^\s"\']+', re.I)),
     ("DATABASE_URL_REDIS",  re.compile(r'rediss?://:[^@\s]+@[^\s"\']+')),
@@ -118,7 +117,7 @@ async def _get_or_create_token(
     if token is None:
         token = display_value(value, entity_type)
         await save_token(conn, session_id, token, value, 0, ttl_hours)
-        _log.info("[MASKED] %s → %s", entity_type, token)
+        _log.info("[MASKED] %s", entity_type)
     return token
 
 
@@ -177,6 +176,20 @@ def detect(text: str) -> list[Entity]:
     return result
 
 
+def _bounded_pattern(original: str) -> re.Pattern[str]:
+    """Build a regex for `original` with word boundaries when the edges are word chars.
+
+    For tokens like `ghp_ABC` or `AKIAxxx` (start+end are word chars) we anchor with `\b` to
+    prevent substring matches inside arbitrary text. For tokens that start/end with non-word
+    chars (URLs, JSON snippets), we drop the boundary on that side since `\b` requires a
+    word↔non-word transition and would never match.
+    """
+    escaped = re.escape(original)
+    left  = r"\b" if original[:1].isalnum() or original[:1] == "_" else ""
+    right = r"\b" if original[-1:].isalnum() or original[-1:] == "_" else ""
+    return re.compile(f"{left}{escaped}{right}")
+
+
 async def mask_message(
     text: str,
     conn,
@@ -187,7 +200,9 @@ async def mask_message(
     # Step 1: replace known values with their display tokens (prevents turn-3 leak).
     mappings = await get_all_mappings(conn, session_id)  # {token: original}
     for token, original in mappings.items():
-        text = text.replace(original, token)
+        if not original:
+            continue
+        text = _bounded_pattern(original).sub(token, text)
 
     # Step 2: detect new entities — CPU-bound regex runs in thread pool
     loop = asyncio.get_running_loop()

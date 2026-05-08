@@ -3,6 +3,7 @@ import pytest
 import respx
 import httpx
 from aivion_mask_claude.anthropic import (
+    UpstreamError,
     walk_request,
     walk_response,
     forward_complete_anthropic,
@@ -237,6 +238,29 @@ async def test_streaming_passthrough_events(conn):
     full = "".join(collected)
     assert "ping" in full
     assert "message_stop" in full
+
+
+@respx.mock
+async def test_forward_complete_raises_upstream_error_on_4xx(conn):
+    err_body = {"type": "error", "error": {"type": "authentication_error", "message": "invalid x-api-key"}}
+    respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(401, json=err_body))
+    with pytest.raises(UpstreamError) as ei:
+        await forward_complete_anthropic({"messages": [], "model": "m"}, _HEADERS, "s1", conn)
+    assert ei.value.status == 401
+    assert ei.value.payload == err_body
+
+
+@respx.mock
+async def test_streaming_yields_error_event_on_4xx(conn):
+    err_body = {"type": "error", "error": {"type": "rate_limit", "message": "slow down"}}
+    respx.post("https://api.anthropic.com/v1/messages").mock(return_value=httpx.Response(429, json=err_body))
+    collected = []
+    async for chunk in forward_streaming_anthropic({"messages": [], "model": "m", "stream": True}, _HEADERS, "s1", conn):
+        collected.append(chunk.decode())
+    full = "".join(collected)
+    assert "event: error" in full
+    assert "rate_limit" in full
+    assert "429" in full
 
 
 @respx.mock

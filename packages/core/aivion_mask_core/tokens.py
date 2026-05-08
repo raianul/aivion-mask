@@ -22,7 +22,6 @@ _ABBREV: dict[str, str] = {
     "PYPI_TOKEN":             "PYPI",
     "SHOPIFY_TOKEN":          "SHPFY",
     "SHOPIFY_CUSTOM_TOKEN":   "SHPFY",
-    "MAILCHIMP_API_KEY":      "MC",
     "MAILGUN_API_KEY":        "MG",
     "DATABASE_URL":           "DB",
     "DATABASE_URL_REDIS":     "DB",

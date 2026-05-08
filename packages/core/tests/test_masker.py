@@ -109,6 +109,19 @@ async def test_mask_message_same_value_same_token(conn):
     r2 = await mask_message("AKIA" + "A" * 16, conn, "s1", 8)
     assert r1 == r2  # same value → same display_value → idempotent
 
+async def test_mask_message_pre_redaction_does_not_match_substring(conn):
+    # First turn: register a custom-pattern-style short original via direct save
+    from aivion_mask_core.session import save_token
+    await save_token(conn, "s1", "FOO***BAR", "FOOBAR", 0, 8)
+    # Second turn: text contains "FOOBAR" as a substring of "FOOBARBAZ".
+    # Word-boundary pre-redaction must NOT corrupt the larger token.
+    result = await mask_message("the FOOBARBAZ value", conn, "s1", 8)
+    assert "FOOBARBAZ" in result
+    # But standalone FOOBAR should be replaced.
+    result2 = await mask_message("just FOOBAR alone", conn, "s1", 8)
+    assert "FOO***BAR" in result2
+
+
 async def test_mask_message_pre_redacts_known_entities(conn):
     await mask_message("key=AKIA" + "A" * 16, conn, "s1", 8)
     result = await mask_message("the key is AKIA" + "A" * 16 + " again", conn, "s1", 8)

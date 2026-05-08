@@ -1,7 +1,10 @@
 from __future__ import annotations
+import logging
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
+
+_log = logging.getLogger(__name__)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -20,7 +23,6 @@ _DEFAULT_TOML = """\
 [sidecar]
 port = 47474
 session_ttl_hours = 8
-idle_shutdown_minutes = 0
 unmask_response = true
 
 # Custom regex patterns (optional):
@@ -32,10 +34,6 @@ unmask_response = true
 # No config needed. API key or OAuth token is forwarded directly from your
 # tool's request headers (ANTHROPIC_BASE_URL + existing auth = done).
 
-# ── OpenAI ───────────────────────────────────────────────────────────────────
-# [openai]
-# api_base = "https://api.openai.com/v1"
-# api_key  = ""
 """
 
 @dataclass
@@ -48,7 +46,6 @@ class CustomPattern:
 class SidecarSettings:
     port: int = 47474
     session_ttl_hours: int = 8
-    idle_shutdown_minutes: int = 0
     unmask_response: bool = True
     custom_patterns: list[CustomPattern] = field(default_factory=list)
 
@@ -62,6 +59,15 @@ class Config:
     sidecar: SidecarSettings = field(default_factory=SidecarSettings)
     openai: OpenAISettings = field(default_factory=OpenAISettings)
 
+def _filter_known(data: dict, cls) -> dict:
+    """Drop unknown keys so old config files don't break newer dataclasses."""
+    known = {f.name for f in fields(cls)}
+    extra = set(data) - known
+    if extra:
+        _log.info("Ignoring unknown config keys for %s: %s", cls.__name__, sorted(extra))
+    return {k: v for k, v in data.items() if k in known}
+
+
 def load_config() -> Config:
     if not CONFIG_PATH.exists():
         AIVION_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,7 +78,7 @@ def load_config() -> Config:
         data = tomllib.load(f)
     sidecar_data = dict(data.get("sidecar", {}))
     raw_patterns = sidecar_data.pop("custom_patterns", [])
-    sidecar = SidecarSettings(**sidecar_data)
-    sidecar.custom_patterns = [CustomPattern(**p) for p in raw_patterns]
-    openai = OpenAISettings(**data.get("openai", {}))
+    sidecar = SidecarSettings(**_filter_known(sidecar_data, SidecarSettings))
+    sidecar.custom_patterns = [CustomPattern(**_filter_known(p, CustomPattern)) for p in raw_patterns]
+    openai = OpenAISettings(**_filter_known(data.get("openai", {}), OpenAISettings))
     return Config(sidecar=sidecar, openai=openai)

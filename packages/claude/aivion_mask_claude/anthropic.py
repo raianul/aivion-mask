@@ -102,6 +102,13 @@ async def _parse_anthropic_sse(response: httpx.Response):
             pending_event = None
 
 
+class UpstreamError(Exception):
+    def __init__(self, status: int, payload: dict):
+        self.status = status
+        self.payload = payload
+        super().__init__(f"upstream returned {status}")
+
+
 async def forward_complete_anthropic(
     body: dict,
     upstream_headers: dict,
@@ -117,7 +124,12 @@ async def forward_complete_anthropic(
         url = f"{url}?{query_string}"
     async with httpx.AsyncClient(timeout=120) as client:
         response = await client.post(url, json=body, headers=upstream_headers)
-        response.raise_for_status()
+        if response.status_code >= 400:
+            try:
+                error_payload = response.json()
+            except ValueError:
+                error_payload = {"error": {"type": "upstream_error", "message": response.text}}
+            raise UpstreamError(response.status_code, error_payload)
         data = response.json()
     if unmask_response:
         data = walk_response(data, mappings)
@@ -146,6 +158,15 @@ async def forward_streaming_anthropic(
         async with client.stream(
             "POST", url, json=body, headers=upstream_headers
         ) as response:
+            if response.status_code >= 400:
+                error_body = await response.aread()
+                try:
+                    error_payload = json.loads(error_body)
+                except json.JSONDecodeError:
+                    error_payload = {"error": {"type": "upstream_error", "message": error_body.decode("utf-8", "replace")}}
+                error_payload["upstream_status"] = response.status_code
+                yield f"event: error\ndata: {json.dumps(error_payload)}\n\n".encode()
+                return
             async for event_name, payload in _parse_anthropic_sse(response):
                 ename = event_name or "data"
 

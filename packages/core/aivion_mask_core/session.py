@@ -32,10 +32,8 @@ async def init_db(db_path: Path | None = None) -> aiosqlite.Connection:
         from .config import AIVION_DIR
         db_path = AIVION_DIR / "sessions.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    is_new = not db_path.exists()
     conn = await aiosqlite.connect(str(db_path))
-    if is_new:
-        db_path.chmod(0o600)
+    db_path.chmod(0o600)
     await conn.execute("PRAGMA journal_mode=WAL")
     for stmt in _SCHEMA:
         await conn.execute(stmt)
@@ -106,3 +104,37 @@ async def cleanup_expired(conn: aiosqlite.Connection) -> int:
     count = cursor.rowcount
     await conn.commit()
     return count
+
+
+async def list_sessions(conn: aiosqlite.Connection, offset: int, limit: int) -> list[dict]:
+    async with conn.execute(
+        """
+        SELECT session_id,
+               COUNT(*)        AS token_count,
+               MIN(created_at) AS first_seen,
+               MAX(expires_at) AS expires_at
+        FROM sessions
+        GROUP BY session_id
+        ORDER BY first_seen DESC
+        LIMIT ? OFFSET ?
+        """,
+        (limit, offset),
+    ) as cursor:
+        rows = await cursor.fetchall()
+    return [
+        {
+            "session_id": r[0],
+            "token_count": r[1],
+            "first_seen": r[2],
+            "expires_at": r[3],
+        }
+        for r in rows
+    ]
+
+
+async def count_sessions(conn: aiosqlite.Connection) -> int:
+    async with conn.execute(
+        "SELECT COUNT(DISTINCT session_id) FROM sessions"
+    ) as cursor:
+        row = await cursor.fetchone()
+    return row[0] if row else 0
