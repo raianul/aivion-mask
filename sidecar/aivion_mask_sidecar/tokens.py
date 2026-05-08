@@ -58,4 +58,10 @@ def make_token(entity_type: str, index: int) -> str:
 
 
 def replace_tokens(text: str, mappings: dict[str, str]) -> str:
-    return _TOKEN_RE.sub(lambda m: mappings.get(m.group(0), m.group(0)), text)
+    # __ABBREV{n}__ style (URL components) — regex replace
+    text = _TOKEN_RE.sub(lambda m: mappings.get(m.group(0), m.group(0)), text)
+    # display_value style (all other types) — string replace
+    for token, original in mappings.items():
+        if not _TOKEN_RE.fullmatch(token):
+            text = text.replace(token, original)
+    return text

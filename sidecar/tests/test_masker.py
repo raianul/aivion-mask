@@ -1,6 +1,35 @@
 import pytest
-from aivion_mask_sidecar.masker import detect, mask_message, Entity
+from aivion_mask_sidecar.masker import detect, mask_message, display_value, Entity
 from aivion_mask_sidecar.session import init_db
+
+# --- display_value() ---
+
+def test_display_value_always_redact_password():
+    assert display_value("mysecret", "URL_PASS") == "***"
+
+def test_display_value_always_redact_aws_secret():
+    assert display_value("A" * 40, "AWS_SECRET_KEY") == "***"
+
+def test_display_value_very_short():
+    assert display_value("ab", "GITHUB_TOKEN") == "***"
+    assert display_value("abcd", "GITHUB_TOKEN") == "***"
+
+def test_display_value_5_to_8():
+    assert display_value("Ahmed", "CUSTOM") == "A***d"
+    assert display_value("abcdefgh", "CUSTOM") == "a***h"
+
+def test_display_value_9_to_16():
+    assert display_value("supersecret", "CUSTOM") == "su***et"
+    assert display_value("a" * 16, "CUSTOM") == "aa***aa"
+
+def test_display_value_17_to_32():
+    val = "prod-internal-key"   # 17 chars
+    assert display_value(val, "CUSTOM") == val[:4] + "***" + val[-4:]
+
+def test_display_value_33_plus():
+    val = "ghp_" + "A" * 36    # 40 chars
+    result = display_value(val, "GITHUB_TOKEN")
+    assert result == val[:6] + "***" + val[-4:]
 
 # --- detect() ---
 
@@ -54,53 +83,55 @@ async def conn(tmp_path):
 async def test_mask_message_assigns_token(conn):
     result = await mask_message("key=AKIA" + "A" * 16 + " text", conn, "s1", 8)
     assert "AKIA" + "A" * 16 not in result
-    assert "__AWS1__" in result
+    # 20-char AWS key → 17-32 tier: first 4 + *** + last 4
+    assert "AKIA***AAAA" in result
 
 async def test_mask_message_database_url_structural(conn):
     result = await mask_message("postgresql://user:pass@localhost:5432/mydb", conn, "s1", 8)
-    # scheme and port preserved; credentials replaced with typed tokens
+    # scheme and port preserved; credentials replaced with display values
     assert result.startswith("postgresql://")
     assert ":5432/" in result
-    assert "user" not in result
-    assert "pass" not in result
-    assert "localhost" not in result
-    assert "mydb" not in result
-    assert "__USER1__" in result
-    assert "__PASS1__" in result
-    assert "__HOST1__" in result
-    assert "__DB1__" in result
+    assert "pass" not in result  # password always → ***
+    assert "***" in result
+    # components are display_value masked inline (not stored as __ABBREV{n}__)
+    assert "__USER" not in result
+    assert "__PASS" not in result
+    assert "__HOST" not in result
+    assert "__DB" not in result
 
 async def test_mask_message_type_specific_abbrev(conn):
     result = await mask_message("token: ghp_" + "A" * 36, conn, "s1", 8)
-    assert "__GH1__" in result
+    # 40-char GH token → 33+ tier: first 6 + *** + last 4
+    assert "ghp_AA***AAAA" in result
 
 async def test_mask_message_same_value_same_token(conn):
     r1 = await mask_message("AKIA" + "A" * 16, conn, "s1", 8)
     r2 = await mask_message("AKIA" + "A" * 16, conn, "s1", 8)
-    assert r1 == r2
+    assert r1 == r2  # same value → same display_value → idempotent
 
 async def test_mask_message_pre_redacts_known_entities(conn):
     await mask_message("key=AKIA" + "A" * 16, conn, "s1", 8)
     result = await mask_message("the key is AKIA" + "A" * 16 + " again", conn, "s1", 8)
     assert "AKIA" + "A" * 16 not in result
-    assert "__AWS1__" in result
+    assert "AKIA***AAAA" in result
 
 async def test_mask_message_no_entities_unchanged(conn):
     assert await mask_message("hello world", conn, "s1", 8) == "hello world"
 
-async def test_mask_message_per_type_counter(conn):
+async def test_mask_message_different_values_get_different_display_tokens(conn):
     t1 = "ghp_" + "A" * 36
     t2 = "ghp_" + "B" * 36
     r1 = await mask_message(t1, conn, "s1", 8)
     r2 = await mask_message(t2, conn, "s1", 8)
-    assert "__GH1__" in r1
-    assert "__GH2__" in r2
+    assert "ghp_AA***AAAA" in r1
+    assert "ghp_BB***BBBB" in r2
+    assert r1 != r2
 
 async def test_mask_message_different_types_independent_counters(conn):
     aws_result = await mask_message("AKIA" + "A" * 16, conn, "s1", 8)
     db_result = await mask_message("postgresql://user:pass@localhost/mydb", conn, "s1", 8)
-    assert "__AWS1__" in aws_result
-    # structural masking: scheme preserved, components tokenised
+    assert "AKIA***AAAA" in aws_result
+    # structural masking: scheme preserved, components display_value masked inline
     assert db_result.startswith("postgresql://")
-    assert "__USER1__" in db_result
-    assert "__PASS1__" in db_result
+    assert "pass" not in db_result
+    assert "***" in db_result

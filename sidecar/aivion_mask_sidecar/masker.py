@@ -5,8 +5,7 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-from .session import get_token, next_index, save_token, get_all_mappings
-from .tokens import entity_abbrev, make_token, register_abbrev
+from .session import get_token, save_token, get_all_mappings
 
 _log = logging.getLogger(__name__)
 
@@ -20,9 +19,7 @@ def register_custom_patterns(entries: list) -> None:
             _log.warning("Skipping invalid custom pattern %r: %s", entry.name, exc)
             continue
         _PATTERNS.append((entry.name, compiled))
-        if entry.abbrev:
-            register_abbrev(entry.name, entry.abbrev)
-        _log.info("[CUSTOM PATTERN] registered %s → __%s{n}__", entry.name, entity_abbrev(entry.name))
+        _log.info("[CUSTOM PATTERN] registered %s", entry.name)
 
 
 @dataclass
@@ -35,14 +32,28 @@ class Entity:
 
 # Each entry: (entity_type, compiled_pattern)
 # Mirrors the credential patterns in core/recognizers/index.ts
+#
+# Pattern length notes:
+#   Exact counts ({n}) — used only when the length is protocol/crypto-determined and stable:
+#     AWS key IDs, Twilio SIDs, Shopify/Mailgun tokens (all hex UUIDs), Azure AccountKey (86 = base64(64 bytes))
+#   Minimum counts ({n,}) — used for provider-defined formats that can change between releases:
+#     GitHub PATs, OpenAI keys, Google API keys, npm tokens
+#   Sources to check when a provider changes formats:
+#     GitHub  → docs.github.com/authentication/keeping-your-account-and-data-secure/about-authentication-to-github
+#     OpenAI  → platform.openai.com/docs/api-reference/authentication
+#     Google  → cloud.google.com/docs/authentication/api-keys
+#     npm     → docs.npmjs.com/about-access-tokens
 _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("AWS_ACCESS_KEY_ID",   re.compile(r'\bAKIA[A-Z0-9]{16}\b')),
     ("AWS_SECRET_KEY",      re.compile(r'(?:aws_secret_access_key|secret_key|secret_access_key)\s*[=:]\s*[\'"]?([A-Za-z0-9/+=]{40})', re.I)),
-    ("GITHUB_TOKEN",        re.compile(r'\b(?:ghp_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{82})\b')),
-    ("OPENAI_API_KEY",      re.compile(r'\bsk-[A-Za-z0-9]{48}\b')),
+    # github.com token formats — {32,} instead of {36} so a length bump doesn't silently miss
+    ("GITHUB_TOKEN",        re.compile(r'\b(?:ghp_[A-Za-z0-9]{32,}|ghs_[A-Za-z0-9]{32,}|gho_[A-Za-z0-9]{32,}|github_pat_[A-Za-z0-9_]{32,})\b')),
+    # OpenAI classic key — {40,} catches any future length increase
+    ("OPENAI_API_KEY",      re.compile(r'\bsk-[A-Za-z0-9]{40,}\b')),
     ("OPENAI_API_KEY_V2",   re.compile(r'\bsk-proj-[A-Za-z0-9_-]{48,}\b')),
     ("ANTHROPIC_API_KEY",   re.compile(r'\bsk-ant-api\d{2}-[A-Za-z0-9_-]{93,}\b')),
-    ("GOOGLE_API_KEY",      re.compile(r'\bAIza[A-Za-z0-9_-]{35}\b')),
+    # Google API key — AIza prefix is stable; payload length can vary
+    ("GOOGLE_API_KEY",      re.compile(r'\bAIza[A-Za-z0-9_-]{32,}\b')),
     ("SLACK_BOT_TOKEN",     re.compile(r'\bxoxb-[0-9]{10,13}-[0-9]{10,13}-[A-Za-z0-9]{24}\b')),
     ("SLACK_USER_TOKEN",    re.compile(r'\bxoxp-[0-9]{10,13}-[0-9]{10,13}-[0-9]{10,13}-[A-Za-z0-9]{32}\b')),
     ("SLACK_APP_TOKEN",     re.compile(r'\bxapp-\d-[A-Z0-9]{10,}-\d{11}-[A-Za-z0-9]{64}\b')),
@@ -52,7 +63,8 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("STRIPE_RESTRICTED",   re.compile(r'\brk_live_[A-Za-z0-9]{24,}\b')),
     ("SENDGRID_API_KEY",    re.compile(r'\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}\b')),
     ("TWILIO_ACCOUNT_SID",  re.compile(r'\bAC[a-f0-9]{32}\b')),
-    ("NPM_TOKEN",           re.compile(r'\bnpm_[A-Za-z0-9]{36}\b')),
+    # npm token — {32,} instead of {36}
+    ("NPM_TOKEN",           re.compile(r'\bnpm_[A-Za-z0-9]{32,}\b')),
     ("PYPI_TOKEN",          re.compile(r'\bpypi-[A-Za-z0-9_-]{32,}\b')),
     ("SHOPIFY_TOKEN",       re.compile(r'\bshpat_[a-fA-F0-9]{32}\b')),
     ("SHOPIFY_CUSTOM_TOKEN",re.compile(r'\bshpca_[a-fA-F0-9]{32}\b')),
@@ -74,16 +86,29 @@ _PATTERNS: list[tuple[str, re.Pattern[str]]] = [
 # Entity types that get structural (per-component) masking instead of whole-value replacement
 _URL_TYPES = {"DATABASE_URL", "DATABASE_URL_REDIS", "URL_WITH_CREDENTIALS"}
 
-# Token abbreviations for URL components — excluded from global pre-redaction because
-# their values (usernames, hostnames, db names) are too short/common to safely replace
-# everywhere. They still work for response unmasking.
-_URL_COMPONENT_ABBREVS = {"USER", "PASS", "HOST", "DB"}
-_URL_COMPONENT_TOKEN_RE = re.compile(r'^__([A-Z]{2,6})\d+__$')
+
+# Entity types whose values must never be partially revealed
+_ALWAYS_REDACT = {"URL_PASS", "AWS_SECRET_KEY"}
 
 
-def _is_url_component_token(token: str) -> bool:
-    m = _URL_COMPONENT_TOKEN_RE.match(token)
-    return m is not None and m.group(1) in _URL_COMPONENT_ABBREVS
+def display_value(value: str, entity_type: str) -> str:
+    """Return a safe partial-reveal string for logging and user display.
+
+    Passwords are always fully hidden. Other values expose a length-proportional
+    prefix+suffix so the LLM retains context without leaking the secret.
+    """
+    if entity_type in _ALWAYS_REDACT:
+        return "***"
+    n = len(value)
+    if n <= 4:
+        return "***"
+    if n <= 8:
+        return value[0] + "***" + value[-1]
+    if n <= 16:
+        return value[:2] + "***" + value[-2:]
+    if n <= 32:
+        return value[:4] + "***" + value[-4:]
+    return value[:6] + "***" + value[-4:]
 
 
 async def _get_or_create_token(
@@ -91,20 +116,18 @@ async def _get_or_create_token(
 ) -> str:
     token = await get_token(conn, session_id, value)
     if token is None:
-        abbrev = entity_abbrev(entity_type)
-        idx = await next_index(conn, session_id, abbrev)
-        token = make_token(entity_type, idx)
-        await save_token(conn, session_id, token, value, idx, ttl_hours)
-        preview = value[:12] + ("..." if len(value) > 12 else "")
-        _log.info("[MASKED] %s → %s  (%s)", entity_type, token, preview)
+        token = display_value(value, entity_type)
+        await save_token(conn, session_id, token, value, 0, ttl_hours)
+        _log.info("[MASKED] %s → %s", entity_type, token)
     return token
 
 
 async def _mask_url_parts(url: str, conn, session_id: str, ttl_hours: int) -> str:
-    """Replace username, password, hostname, and db name with individual tokens.
+    """Replace username, password, hostname, and db name with display values inline.
 
     Preserves scheme, port, and URL structure so the LLM retains semantic meaning.
-    Falls back to whole-URL masking if the URL can't be parsed.
+    URL components are NOT stored in the session — their values are too short/common
+    for safe pre-redaction. Falls back to whole-URL masking if parsing fails.
     """
     try:
         p = urlparse(url)
@@ -114,25 +137,24 @@ async def _mask_url_parts(url: str, conn, session_id: str, ttl_hours: int) -> st
         return await _get_or_create_token(conn, session_id, url, "DATABASE_URL", ttl_hours)
 
     port_str = f":{p.port}" if p.port else ""
+    db_name = p.path.lstrip("/") if p.path else ""
 
-    user_tok = await _get_or_create_token(conn, session_id, p.username, "URL_USER", ttl_hours) if p.username else None
-    pass_tok = await _get_or_create_token(conn, session_id, p.password, "URL_PASS", ttl_hours) if p.password else None
-    host_tok = await _get_or_create_token(conn, session_id, p.hostname, "URL_HOST", ttl_hours) if p.hostname else None
-    db_name  = p.path.lstrip("/") if p.path else ""
-    db_tok   = await _get_or_create_token(conn, session_id, db_name, "URL_DB", ttl_hours) if db_name else None
+    user_disp = display_value(p.username, "URL_USER") if p.username else None
+    pass_disp = display_value(p.password, "URL_PASS") if p.password else None
+    host_disp = display_value(p.hostname, "URL_HOST") if p.hostname else None
+    db_disp   = display_value(db_name, "URL_DB") if db_name else None
 
-    host_part = f"{host_tok or p.hostname or ''}{port_str}"
-    if user_tok and pass_tok:
-        netloc = f"{user_tok}:{pass_tok}@{host_part}"
-    elif user_tok:
-        netloc = f"{user_tok}@{host_part}"
-    elif pass_tok:
-        # Redis-style: redis://:password@host
-        netloc = f":{pass_tok}@{host_part}"
+    host_part = f"{host_disp or p.hostname or ''}{port_str}"
+    if user_disp and pass_disp:
+        netloc = f"{user_disp}:{pass_disp}@{host_part}"
+    elif user_disp:
+        netloc = f"{user_disp}@{host_part}"
+    elif pass_disp:
+        netloc = f":{pass_disp}@{host_part}"
     else:
         netloc = host_part
 
-    path = f"/{db_tok}" if db_tok else ""
+    path = f"/{db_disp}" if db_disp else ""
     return f"{p.scheme}://{netloc}{path}"
 
 
@@ -162,13 +184,10 @@ async def mask_message(
     ttl_hours: int,
 ) -> str:
     """Pre-redact known entities, detect new ones, assign tokens, return masked text."""
-    # Step 1: replace known values with their tokens (prevents turn-3 leak).
-    # Skip URL component tokens — their values (usernames, hostnames, db names) are too
-    # short/generic to replace globally without corrupting unrelated text.
+    # Step 1: replace known values with their display tokens (prevents turn-3 leak).
     mappings = await get_all_mappings(conn, session_id)  # {token: original}
     for token, original in mappings.items():
-        if not _is_url_component_token(token):
-            text = text.replace(original, token)
+        text = text.replace(original, token)
 
     # Step 2: detect new entities — CPU-bound regex runs in thread pool
     loop = asyncio.get_running_loop()

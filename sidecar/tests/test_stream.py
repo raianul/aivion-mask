@@ -88,3 +88,36 @@ def test_flush_empty_after_complete_push():
     buf = LookaheadBuffer({"__DB1__": "secret"})
     buf.push("value is __DB1__ done")
     assert buf.flush() == ""
+
+
+# --- LookaheadBuffer with display_value-style tokens ---
+
+def test_replaces_display_value_token():
+    token = "ghp_AA***AAAA"
+    original = "ghp_" + "A" * 36
+    buf = LookaheadBuffer({token: original})
+    out = buf.push(f"use {token} here") + buf.flush()
+    assert original in out
+    assert token not in out
+
+
+def test_handles_split_display_value():
+    token = "ghp_AA***AAAA"
+    original = "ghp_" + "A" * 36
+    buf = LookaheadBuffer({token: original})
+    # Token arrives split: "ghp_AA*" in first chunk, "**AAAA ok" in second
+    out1 = buf.push("token ghp_AA*")
+    out2 = buf.push("**AAAA ok")
+    full = out1 + out2 + buf.flush()
+    assert original in full
+    assert token not in full
+
+
+def test_display_value_and_url_component_coexist():
+    mappings = {"__DB1__": "mydb", "AKIA***AAAA": "AKIA" + "A" * 16}
+    buf = LookaheadBuffer(mappings)
+    out = buf.push("db=__DB1__ key=AKIA***AAAA") + buf.flush()
+    assert "mydb" in out
+    assert "AKIA" + "A" * 16 in out
+    assert "__DB1__" not in out
+    assert "AKIA***AAAA" not in out

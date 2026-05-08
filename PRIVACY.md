@@ -7,7 +7,7 @@
 Aivion Mask does not collect, store, transmit, or process any personal data.
 All processing runs locally on your machine. Nothing leaves your device.
 
----
+--- 
 
 ## What the extension does
 

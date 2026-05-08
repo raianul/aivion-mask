@@ -41,15 +41,12 @@ async def conn(tmp_path):
 
 
 def _url_masked(text: str) -> bool:
-    """True if text contains a structurally-masked DB URL (scheme preserved, components tokenised)."""
+    """True if text contains a structurally-masked DB URL (scheme preserved, secrets hidden)."""
     return (
         "postgresql://" in text
-        and "__USER" in text
-        and "__PASS" in text
-        and "__HOST" in text
-        and "__DB" in text
         and "s3cr3tpass" not in text
         and "db.example.com" not in text
+        and "***" in text
     )
 
 
@@ -117,7 +114,7 @@ async def test_walk_request_tool_use_input(conn):
     cmd = result["messages"][0]["content"][0]["input"]["command"]
     assert cmd.startswith("psql postgresql://")
     assert "s3cr3tpass" not in cmd
-    assert "__PASS" in cmd
+    assert "***" in cmd
 
 
 async def test_walk_request_preserves_non_text_blocks(conn):

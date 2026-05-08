@@ -27,7 +27,7 @@ unmask_response = true
 # [[sidecar.custom_patterns]]
 # name = "MY_INTERNAL_TOKEN"
 # pattern = 'int_[A-Za-z0-9]{32}'
-# abbrev = "INT"   # optional — token becomes __INT1__, __INT2__, etc.
+# abbrev is unused — masked values use partial-reveal display (e.g. int_AB***yz)
 
 [llm]
 api_base = "https://api.openai.com/v1"
@@ -38,7 +38,7 @@ api_key = ""
 class CustomPattern:
     name: str
     pattern: str
-    abbrev: str = ""  # if empty, derived from name (first 3 chars uppercase)
+    abbrev: str = ""  # kept for config compat; no longer used (masked values are display_value format)
 
 @dataclass
 class SidecarSettings:

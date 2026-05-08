@@ -29,6 +29,12 @@ def test_delete_session(client):
     assert r.status_code == 200
 
 
+def test_messages_no_auth(client):
+    r = client.post("/v1/messages", json={"model": "claude-sonnet-4-6", "max_tokens": 1, "messages": []})
+    assert r.status_code == 401
+    assert "auth" in r.json()["detail"].lower()
+
+
 def test_chat_completions_no_api_key(client):
     from aivion_mask_sidecar import main as m
     from aivion_mask_sidecar.config import Config, SidecarSettings, LLMSettings
