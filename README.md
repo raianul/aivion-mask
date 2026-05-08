@@ -97,11 +97,27 @@ Both OAuth (subscription) and API key auth pass through unchanged. The proxy nev
 
 ## Supported Credential Types
 
-**Secrets & keys:** AWS_ACCESS_KEY, GITHUB_TOKEN, OPENAI_KEY, GOOGLE_API_KEY, AZURE_KEY, NPM_TOKEN, GENERIC_API_KEY
+**Cloud keys:** AWS_ACCESS_KEY_ID, AWS_SECRET_KEY, GOOGLE_API_KEY, AZURE_STORAGE
 
-**Connection strings:** DATABASE_URL (Postgres, MySQL, MongoDB, Redis)
+**Source control:** GITHUB_TOKEN (ghp_, ghs_, gho_, github_pat_)
 
-**PII:** EMAIL_ADDRESS, PHONE_NUMBER, IP_ADDRESS, URL
+**AI providers:** OPENAI_API_KEY, OPENAI_API_KEY_V2 (sk-proj-), ANTHROPIC_API_KEY
+
+**Payments:** STRIPE_SECRET_KEY, STRIPE_TEST_KEY, STRIPE_RESTRICTED
+
+**Messaging:** SLACK_BOT_TOKEN, SLACK_USER_TOKEN, SLACK_APP_TOKEN, SLACK_WEBHOOK, SENDGRID_API_KEY, MAILCHIMP_API_KEY, MAILGUN_API_KEY, TWILIO_ACCOUNT_SID
+
+**Package registries:** NPM_TOKEN, PYPI_TOKEN
+
+**E-commerce:** SHOPIFY_TOKEN, SHOPIFY_CUSTOM_TOKEN
+
+**Infrastructure:** TERRAFORM_TOKEN, DOCKER_HUB_PAT, FIREBASE_URL
+
+**Connection strings:** DATABASE_URL (Postgres, MySQL, MongoDB), DATABASE_URL_REDIS, URL_WITH_CREDENTIALS
+
+**Cryptographic:** PRIVATE_KEY (RSA, EC, OpenSSH), JWT_TOKEN
+
+**Network:** PRIVATE_IP (10.x, 192.168.x, 172.16-31.x)
 
 **Custom:** Regex-based patterns via `~/.aivion-mask/config.toml`
 
