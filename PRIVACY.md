@@ -1,50 +1,68 @@
 # Privacy Policy — Aivion Mask
 
-**Last updated:** 2026-05-06
+**Last updated:** 2026-05-08
 
 ## Summary
 
-Aivion Mask does not collect, store, transmit, or process any personal data.
-All processing runs locally on your machine. Nothing leaves your device.
+Aivion Mask does not collect, transmit, or process any data on behalf of Aivion. All processing runs locally on your machine. The only outbound network requests are the LLM API calls you explicitly route through the proxy — nothing goes to Aivion servers.
 
---- 
+---
 
-## What the extension does
+## What the sidecar does
 
-Aivion Mask monitors your clipboard for credentials and secrets (API keys, passwords, tokens, connection strings) using locally-executed regex patterns. When a secret is detected, it either warns you or replaces the clipboard contents with a redacted placeholder.
+Aivion Mask runs a local HTTP proxy on `localhost:47474`. It intercepts LLM API requests from your tools (Claude Code, SDK scripts, etc.), detects and replaces credentials and secrets with short-lived tokens, forwards the masked request to the upstream LLM API (e.g. `api.anthropic.com`), and restores the originals in the response before returning it to you.
+
+---
 
 ## Data collection
 
-**None.**
+**None — by Aivion.**
 
 - No telemetry
 - No analytics
 - No crash reporting
 - No usage statistics
-- No network requests of any kind
+- No requests to Aivion servers of any kind
 
-The extension has no internet connectivity. It operates entirely within VS Code's extension host process on your local machine.
+---
 
-## Data storage
+## Local data storage
 
-**None.**
+The sidecar writes to your local machine only:
 
-The extension holds the current clipboard text in memory only for the duration of a single poll cycle (~500ms). No data is written to disk, no logs are kept, no session state is persisted.
+| What | Where | Why | Retention |
+|---|---|---|---|
+| Session token mappings (masked token ↔ original value) | `~/.aivion-mask/sessions.db` (SQLite) | Needed to restore originals in LLM responses | TTL 8 hours by default, configurable |
+| Config file | `~/.aivion-mask/config.toml` | Sidecar settings (port, patterns, API key if configured) | Until you delete it |
+
+No logs of request content are written. The SQLite database stores only the token↔original mapping pairs, not the full request or response text.
+
+---
+
+## Network requests
+
+The sidecar makes outbound HTTPS requests **only** to the upstream LLM API you configure (default: `api.anthropic.com`). Your API key or OAuth token is forwarded in the request header, exactly as your tool would have sent it. Aivion Mask never sees, stores, or transmits your credentials to any other destination.
+
+---
 
 ## Third parties
 
-No data is shared with any third party. There are no third-party SDKs, trackers, or services embedded in the extension.
+No data is shared with any third party beyond the LLM API you have explicitly configured. There are no third-party SDKs, trackers, or analytics services.
+
+---
 
 ## Your rights (GDPR)
 
-Since no personal data is collected or stored, there is no data to access, correct, or delete. No consent is required for processing under GDPR Article 6 because no personal data processing takes place.
+The only personal data that may be processed locally is whatever you include in your LLM prompts (which you control). Aivion does not receive or store this data. If you want to clear local session data, delete `~/.aivion-mask/sessions.db` or call `DELETE /v1/session/{id}` on the running sidecar.
 
 If you have any questions, contact:
 
-**Controller:** Sayed Raianul Kabir, Germany
-**Email:** raianul.kabir@gmail.com
+**Controller:** Sayed Raianul Kabir  
+**Email:** raianul.berlin@gmail.com  
 **GitHub:** https://github.com/raianul/aivion-mask
+
+---
 
 ## Future versions
 
-If future versions of Aivion Mask introduce any form of data collection (e.g. optional server-side audit trail in enterprise mode), this policy will be updated before release and users will be explicitly informed.
+If future versions introduce any form of server-side data collection (e.g. optional cloud audit trail), this policy will be updated before release and users will be explicitly informed.
